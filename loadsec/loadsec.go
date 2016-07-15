@@ -35,6 +35,7 @@ type certHolder struct {
 func refresh(ch *certHolder) {
 	tick := time.NewTicker(8 * time.Hour)
 	for range tick.C {
+		// FIXME run this code once at start, maybe in CertFromSec
 		if closeToExpiration(cert) {
 			cert, err := client.FetchTLSSecret(secretName)
 			if err != nil {
