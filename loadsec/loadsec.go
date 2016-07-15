@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// FIXME actually this should just be a file reader
 func CertFromSec(client kube.Client, secretName string) (func(string) (*x509.Certificate, error), error) {
 	cert, err := client.FetchTLSSecret(secretName)
 	if err != nil {
