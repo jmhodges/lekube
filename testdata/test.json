@@ -1,0 +1,20 @@
+{
+  "email": "jeff+lekubetest@somethingsimilar.com",
+  "secrets": [
+    {
+      "namespace": "default",
+      "name": "test",
+      "domains": ["test.example.com"]
+    },
+    {
+      "namespace": "default",
+      "name": "missingtest",
+      "domains": ["test.example.com"]
+    },
+    {
+      "namespace": "staging",
+      "name": "missingtest",
+      "domains": ["test.example.com"]
+    }
+  ]
+}

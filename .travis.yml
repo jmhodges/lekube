@@ -1,0 +1,20 @@
+language: go
+go:
+  - 1.6.3
+
+sudo: required
+
+services:
+  - docker
+
+branches:
+  only:
+    - master
+    - /^test_/
+    - /^test-/
+
+install:
+  - go test -i ./lekube-fetch
+
+script:
+  - go test -v ./lekube-fetch && ./travis_docker_push.sh
