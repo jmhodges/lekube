@@ -87,7 +87,7 @@ func run(conf *allConf) {
 	}
 }
 
-func fetchTLSSecret(secretName string) (*keyPair, error) {
+func fetchTLSSecret(secretName string) (*tlsSecret, error) {
 
 }
 
