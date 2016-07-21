@@ -271,6 +271,15 @@
 			"notests": true
 		},
 		{
+			"importpath": "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3",
+			"repository": "https://github.com/kubernetes/kubernetes",
+			"vcs": "git",
+			"revision": "9b1f3efab48adbf55244cc5a03474d181d6a179f",
+			"branch": "master",
+			"path": "/pkg/client/clientset_generated/release_1_3",
+			"notests": true
+		},
+		{
 			"importpath": "k8s.io/kubernetes/pkg/client/metrics",
 			"repository": "https://github.com/kubernetes/kubernetes",
 			"vcs": "git",
