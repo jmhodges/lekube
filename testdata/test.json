@@ -1,0 +1,9 @@
+{
+  "secrets": [
+    {
+      "namespace": "default",
+      "secret_name": "testsecret",
+      "domains": ["good.example.com"]
+    }
+  ]
+}
