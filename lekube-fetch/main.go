@@ -1,8 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"expvar"
 	"flag"
 	"fmt"
@@ -22,7 +24,7 @@ import (
 var (
 	confPath           = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
 	server             = flag.String("server", "acme-v01.api.letsencrypt.org", "ACME API server domain to use for fetching certificates")
-	startRenewDur      = flag.Duration("renewCertDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
+	startRenewDur      = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
 	betweenChecksDur   = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
 	fetchSecretErrors  = &expvar.Int{}
 	fetchCertErrors    = &expvar.Int{}
@@ -56,7 +58,7 @@ func main() {
 		if secDom.SecretName == "" {
 			log.Fatalf("no SecretName given for secret config at index %d in \"secrets\"", i)
 		}
-		if secDom.Namespace == "" {
+		if secDom.Namespace == nil {
 			log.Fatalf("no Namespace given for secret config at index %d in \"secrets\"", i)
 		}
 		if secs[secDom.SecretName] {
@@ -87,38 +89,46 @@ func main() {
 
 }
 func run(client core13.CoreInterface, conf *allConf) {
-	certs := make(map[string]*tlsSecret)
+	tlsSecs := make(map[string]*tlsSecret)
 	okaySecs := []*secretConf{}
 	for _, secDom := range conf.Secrets {
-		cert, err := fetchTLSSecret(client.Secrets(secDom.Namespace), secDom.SecretName)
+		tlsSec, err := fetchTLSSecret(client.Secrets(*secDom.Namespace), secDom.SecretName)
 		if err != nil {
 			// FIXME mention tls.crt and tls.key in #config-format
 			recordError(fetchSecret, "unable to fetch TLS secret value %#v: %s", secDom.SecretName, err)
 			continue
 		}
-		certs[secDom.SecretName] = cert
+		tlsSecs[secDom.SecretName] = tlsSec
 		okaySecs = append(okaySecs, secDom)
 	}
-	fmt.Println(certs)
-	// FIXME uncomment this
-	// for _, secDom := range okaySecs {
-	// 	cert := certs[secDom.SecretName]
-	// 	if cert == nil || closeToExpiration(cert) || domainMismatch(cert, secDom.Domains) {
-	// 		newCertPair, err := fetchLECert(acmeClient, email, secDom.Domains)
-	// 		if err != nil {
-	// 			recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secDom.SecretName, err)
-	// 			continue
-	// 		}
-	// 		// FIXME include kube resource version in cert object so that we
-	// 		// can fail on attempting to update a secret that's already been
-	// 		// refreshed.
-	// 		err = storeTLSSecret(secDom.SecretName, cert, newCertPair)
-	// 		if err != nil {
-	// 			// FIXME handle some other process updating it instead?
-	// 			recordError(storeSecret, "unable to store the TLS cert and key as secret %#v: %s", secDom.SecretName, err)
-	// 		}
-	// 	}
-	// }
+	for _, secDom := range okaySecs {
+		tlsSec := tlsSecs[secDom.SecretName]
+		if tlsSec == nil {
+			// FIXME remove all of these
+			log.Println("nil tlsSec :(")
+			continue
+		} else {
+			log.Println("welp", closeToExpiration(tlsSec.Cert), domainMismatch(tlsSec.Cert, secDom.Domains))
+		}
+
+		if tlsSec == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secDom.Domains) {
+			// newCertPair, err := fetchLECert(acmeClient, email, secDom.Domains)
+			// if err != nil {
+			// 	recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secDom.SecretName, err)
+			// 	continue
+			// }
+			// FIXME include kube resource version in cert object so that we
+			// can fail on attempting to update a secret that's already been
+			// refreshed.
+			newCert := tlsSec.Secret.Data["tls.crt"]
+			newKey := tlsSec.Secret.Data["tls.key"]
+			err := storeTLSSecret(client.Secrets(*secDom.Namespace), tlsSec.Secret, newCert, newKey)
+			if err != nil {
+				// FIXME handle some other process updating it instead?
+				recordError(storeSecret, "unable to store the TLS cert and key as secret %#v: %s", secDom.SecretName, err)
+			}
+		}
+	}
 }
 
 func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
@@ -134,20 +144,33 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	if !ok {
 		return nil, fmt.Errorf("secret %#v has no tls.crt", secretName)
 	}
-	cert, err := x509.ParseCertificate(b)
+	// This confirms the key and cert parse correctly and are both of the right
+	// types (RSA, ECDSA). Unfortunately, since the Leaf cert isn't kept in the
+	// tls.Certificate (see the docs for tls.X509KeyPair), we have to do that
+	// work again to set it.
+	tcert, err := tls.X509KeyPair(b, kb)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse certificate already in secret, discontinuing to prevent damage: %s", err)
+		return nil, fmt.Errorf("unable to parse key pair already in secret %#v, discontinuing to prevent damage: %s", secretName, err)
 	}
-	_, err = x509.ParsePKCS1PrivateKey(kb)
+	block, _ := pem.Decode(b)
+	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse private key already in secret, discontinuing to prevent damage: %s", err)
+		return nil, fmt.Errorf("unable to parse certificates already in secret %#v, discontinuing to prevent damage: %s", secretName, err)
 	}
-
+	tcert.Leaf = certs[0]
 	ts := &tlsSecret{
-		Cert:   cert,
+		Cert:   tcert,
 		Secret: sec,
 	}
 	return ts, nil
+}
+
+func storeTLSSecret(cl core13.SecretInterface, sec *kubeapi.Secret, newCert []byte, newKey []byte) error {
+	sec.Data["tls.crt"] = newCert
+	sec.Data["tls.key"] = newKey
+	_, err := cl.Update(sec)
+	log.Println("Updated", sec.Name)
+	return err
 }
 
 // FIXME also uncomment this
@@ -202,7 +225,7 @@ type newTLSSecret struct {
 }
 
 type tlsSecret struct {
-	Cert *x509.Certificate
+	Cert tls.Certificate
 	*kubeapi.Secret
 }
 
@@ -225,15 +248,16 @@ func recordError(st stage, format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-func closeToExpiration(sec *tlsSecret) bool {
+func closeToExpiration(cert tls.Certificate) bool {
 	t := time.Now().Add(*startRenewDur)
-	return t.Equal(sec.Cert.NotAfter) || t.After(sec.Cert.NotAfter)
+	log.Println(t, cert.Leaf.NotAfter)
+	return t.Equal(cert.Leaf.NotAfter) || t.After(cert.Leaf.NotAfter)
 }
 
-func domainMismatch(sec *tlsSecret, domains []string) bool {
+func domainMismatch(cert tls.Certificate, domains []string) bool {
 	cdoms := []string{}
-	cdoms = append(cdoms, sec.Cert.Subject.CommonName)
-	cdoms = append(cdoms, sec.Cert.DNSNames...)
+	cdoms = append(cdoms, cert.Leaf.Subject.CommonName)
+	cdoms = append(cdoms, cert.Leaf.DNSNames...)
 	sort.Strings(cdoms)
 	doms := make([]string, len(domains))
 	// sort.Strings has side-effects on domains, but fetchLECert uses the order
@@ -260,7 +284,7 @@ type allConf struct {
 }
 
 type secretConf struct {
-	Namespace  string   `json:"namespace"`
+	Namespace  *string  `json:"namespace"`
 	SecretName string   `json:"secret_name"` // name of the secret
 	Domains    []string `json:"domains"`     // FIXME check for empty strings
 }
