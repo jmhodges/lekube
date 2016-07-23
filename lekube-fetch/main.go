@@ -12,6 +12,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"expvar"
 	"flag"
 	"fmt"
@@ -25,10 +26,7 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/hlandau/acme/acmeapi"
-	"github.com/hlandau/acme/acmeapi/acmeendpoints"
-	"github.com/hlandau/acme/responder"
-	"github.com/hlandau/acme/solver"
+	"github.com/google/acme"
 
 	kubeapi "k8s.io/kubernetes/pkg/api/v1"
 	kube13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
@@ -41,6 +39,7 @@ var (
 	useProd          = flag.Bool("prod", false, "if given, use the production Let's Encrypt API instead of the default staging API")
 	startRenewDur    = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
 	betweenChecksDur = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
+	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
 
 	fetchSecretErrors  = &expvar.Int{}
 	fetchCertErrors    = &expvar.Int{}
@@ -110,40 +109,55 @@ func main() {
 		Timeout: 20 * time.Second,
 	}
 
-	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Fatalf("unable to generate private account key (not a TLS private key) for the Let's Encrypt account: %s", err)
 	}
-	acmeClient := &acmeapi.Client{
-		AccountKey:   accountKey,
-		DirectoryURL: acmeendpoints.LetsEncryptStaging.DirectoryURL,
-		HTTPClient:   httpClient,
+	acmeClient := &acme.Client{
+		Key:    accountKey,
+		Client: *httpClient,
 	}
+	responder, err := newLEResponser(accountKey)
+	if err != nil {
+		log.Fatalf("unable to make responder: %s", err)
+	}
+	directoryURL := "https://acme-staging.api.letsencrypt.org/directory"
 	if *useProd {
-		acmeClient.DirectoryURL = acmeendpoints.LetsEncryptLive.DirectoryURL
+		directoryURL = "https://acme-v01.api.letsencrypt.org/directory"
+	}
+	ep, err := acme.Discover(httpClient, directoryURL)
+	if err != nil {
+		log.Fatalf("unable to discover ACME endpoints: %s", err)
 	}
 	// FIXME check for an account being saved already
-	reg := &acmeapi.Registration{
-		Resource:    "new-reg", // FIXME support old regs
-		ContactURIs: []string{fmt.Sprintf("mailto:%s", conf.Email)},
+	// FIXME support old regs
+	acc := &acme.Account{
+		Contact: []string{fmt.Sprintf("mailto:%s", conf.Email)},
 	}
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
-	err = acmeClient.UpsertRegistration(reg, ctx)
+
+	err = acmeClient.Register(ep.RegURL, acc)
 	if err != nil {
 		log.Fatalf("unable to create new registration: %s", err)
 	}
-	cancelFunc()
+	ch := make(chan error)
+	go func() {
+		ch <- http.ListenAndServe(*httpAddr, responder)
+	}()
 
-	run(acmeClient, client, conf)
-	for range tick.C {
-		run(acmeClient, client, conf)
+	go func() {
+		run(acmeClient, &ep, responder, client, conf)
+		for range tick.C {
+			run(acmeClient, &ep, responder, client, conf)
+		}
+	}()
+	err = <-ch
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
-func run(acmeClient *acmeapi.Client, client core13.CoreInterface, conf *allConf) {
-	ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancelFunc()
-
+func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, client core13.CoreInterface, conf *allConf) {
+	responder.Reset()
 	tlsSecs := make(map[string]*tlsSecret)
 	okaySecs := []*secretConf{}
 	alreadyAuthDomains := make(map[string]bool)
@@ -162,7 +176,7 @@ func run(acmeClient *acmeapi.Client, client core13.CoreInterface, conf *allConf)
 		tlsSec := tlsSecs[secConf.SecretName]
 
 		if tlsSec == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			leCert, err := fetchLECert(ctx, acmeClient, secConf, conf.HTTPAddr, alreadyAuthDomains)
+			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, conf.HTTPAddr, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
@@ -217,17 +231,26 @@ func storeTLSSecret(cl core13.SecretInterface, sec *kubeapi.Secret, leCert *newC
 	return err
 }
 
-func fetchLECert(ctx context.Context, cl *acmeapi.Client, sconf *secretConf, httpAddr string, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sconf *secretConf, httpAddr string, alreadyAuthDomains map[string]bool) (*newCert, error) {
 	for _, dom := range sconf.Domains {
 		if alreadyAuthDomains[dom] {
 			continue
 		}
-		ccfg := responder.ChallengeConfig{
-			HTTPPorts: []string{httpAddr},
-		}
-		_, err := solver.Authorize(cl, dom, ccfg, ctx)
+		a, err := cl.Authorize(ep.AuthzURL, dom)
 		if err != nil {
 			return nil, err
+		}
+		ch, err := findChallenge(a)
+		if err != nil {
+			return nil, err
+		}
+		responder.Authorize(context.TODO(), ch.Token)
+		a2, err := cl.GetAuthz(a.URI)
+		if err != nil {
+			return nil, err
+		}
+		if a2.Status != acme.StatusValid {
+			return nil, fmt.Errorf("unable to authorize for %s: auth status was %#v", dom, a2.Status)
 		}
 		alreadyAuthDomains[dom] = true
 	}
@@ -271,20 +294,21 @@ func fetchLECert(ctx context.Context, cl *acmeapi.Client, sconf *secretConf, htt
 		return nil, err
 	}
 
-	acrt, err := cl.RequestCertificate(csrDER, ctx)
+	certDERs, _, err := cl.CreateCert(ep.CertURL, csrDER, 0, true)
 	if err != nil {
 		return nil, err
 	}
-
-	err = cl.WaitForCertificate(acrt, ctx)
-	if err != nil {
-		return nil, err
+	cert := []byte{}
+	for _, c := range certDERs {
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: c,
+		}
+		cert = append(cert, '\n')
+		cert = append(cert, pem.EncodeToMemory(block)...)
 	}
-
-	certs := [][]byte{acrt.Certificate}
-	certs = append(certs, acrt.ExtraCertificates...)
 	nc := &newCert{
-		Cert: bytes.Join(certs, []byte{'\n'}),
+		Cert: cert,
 		Key:  keyOut.Bytes(),
 	}
 	return nc, nil
@@ -375,4 +399,13 @@ type secretConf struct {
 	SecretName string   `json:"secret_name"` // name of the secret
 	Domains    []string `json:"domains"`     // FIXME check for empty strings
 	UseRSA     bool     // use ECDSA in the certs if false, RSA for certs
+}
+
+func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
+	for _, comb := range a.Combinations {
+		if len(comb) == 1 && a.Challenges[comb[0]].Type == "http" {
+			return &a.Challenges[comb[0]], nil
+		}
+	}
+	return nil, errors.New("no challenge combination of just http")
 }
