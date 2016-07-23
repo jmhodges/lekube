@@ -178,7 +178,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
 			}
-			err = storeTLSSecret(client.Secrets(*secConf.Namespace), tlsSec.Secret, leCert)
+			err = storeTLSSecret(client.Secrets(*secConf.Namespace), secConf, tlsSec.Secret, leCert)
 			if err != nil {
 				// FIXME handle some other process updating it instead?
 				recordError(storeSecret, "unable to store the TLS cert and key as secret %#v: %s", secConf.SecretName, err)
@@ -187,11 +187,14 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 	}
 }
 
+// fetchTLSSecret may return a nil tlsSecret if no secret was found.
 func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
 	sec, err := client.Get(secretName)
 	if err != nil {
+		// FIXME figure out what a 404 looks like
 		return nil, err
 	}
+	// FIXME if both tls.key and tls.crt are missing, just return nil
 	kb, ok := sec.Data["tls.key"]
 	if !ok {
 		return nil, fmt.Errorf("secret %#v has no tls.key", secretName)
@@ -221,10 +224,22 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	return ts, nil
 }
 
-func storeTLSSecret(cl core13.SecretInterface, sec *kubeapi.Secret, leCert *newCert) error {
+func storeTLSSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
+	f := cl.Update
+	sec := oldSec
+	if oldSec == nil {
+		f = cl.Create
+		sec = &kubeapi.Secret{
+			ObjectMeta: kubeapi.ObjectMeta{
+				Name: secConf.SecretName,
+			},
+			Data: make(map[string][]byte),
+		}
+	}
+
 	sec.Data["tls.crt"] = leCert.Cert
 	sec.Data["tls.key"] = leCert.Key
-	_, err := cl.Update(sec)
+	_, err := f(sec)
 	return err
 }
 
@@ -392,7 +407,7 @@ type allConf struct {
 
 type secretConf struct {
 	Namespace  *string  `json:"namespace"`
-	SecretName string   `json:"secret_name"` // name of the secret
+	SecretName string   `json:"secret_name"` // FIXME change to name / name of the secret
 	Domains    []string `json:"domains"`     // FIXME check for empty strings
 	UseRSA     bool     // use ECDSA in the certs if false, RSA for certs
 }
