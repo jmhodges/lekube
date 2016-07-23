@@ -2,6 +2,46 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/alecthomas/assert",
+			"repository": "https://github.com/alecthomas/assert",
+			"vcs": "git",
+			"revision": "5c23cad1f9b95ff384d7a741c3896a404aec4e7b",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/alecthomas/colour",
+			"repository": "https://github.com/alecthomas/colour",
+			"vcs": "git",
+			"revision": "60882d9e27213e8552dcff6328914fe4c2b44bc9",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/alecthomas/repr",
+			"repository": "https://github.com/alecthomas/repr",
+			"vcs": "git",
+			"revision": "f010939cadb8dfd81374f1a42f2f030d82602eb7",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/alecthomas/template",
+			"repository": "https://github.com/alecthomas/template",
+			"vcs": "git",
+			"revision": "a0175ee3bccc567396460bf5acd36800cb10c49c",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/alecthomas/units",
+			"repository": "https://github.com/alecthomas/units",
+			"vcs": "git",
+			"revision": "2efee857e7cfd4f3d0138cc3cbb1b4966962b93a",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/golang/protobuf/proto",
 			"repository": "https://github.com/golang/protobuf",
 			"vcs": "git",
@@ -20,12 +60,91 @@
 			"notests": true
 		},
 		{
+			"importpath": "github.com/google/acme",
+			"repository": "https://github.com/google/acme",
+			"vcs": "git",
+			"revision": "ba87e98560afb779c71677ab09bcb0f6733d9c91",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/mattn/go-isatty",
+			"repository": "https://github.com/mattn/go-isatty",
+			"vcs": "git",
+			"revision": "56b76bdf51f7708750eac80fa38b952bb9f32639",
+			"branch": "master",
+			"notests": true
+		},
+		{
 			"importpath": "github.com/petar/GoLLRB/llrb",
 			"repository": "https://github.com/petar/GoLLRB",
 			"vcs": "git",
 			"revision": "53be0d36a84c2a886ca057d34b6aa4468df9ccb4",
 			"branch": "master",
 			"path": "/llrb",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/sergi/go-diff/diffmatchpatch",
+			"repository": "https://github.com/sergi/go-diff",
+			"vcs": "git",
+			"revision": "ec7fdbb58eb3e300c8595ad5ac74a5aa50019cc7",
+			"branch": "master",
+			"path": "/diffmatchpatch",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchr/testify/assert",
+			"repository": "https://github.com/stretchr/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "/assert",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"repository": "https://github.com/stretchr/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "vendor/github.com/davecgh/go-spew/spew",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"repository": "https://github.com/stretchr/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "vendor/github.com/pmezard/go-difflib/difflib",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchrcom/testify/assert",
+			"repository": "https://github.com/stretchrcom/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "/assert",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchrcom/testify/vendor/github.com/davecgh/go-spew/spew",
+			"repository": "https://github.com/stretchrcom/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "vendor/github.com/davecgh/go-spew/spew",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stretchrcom/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"repository": "https://github.com/stretchrcom/testify",
+			"vcs": "git",
+			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
+			"branch": "master",
+			"path": "vendor/github.com/pmezard/go-difflib/difflib",
 			"notests": true
 		},
 		{
@@ -38,10 +157,35 @@
 			"notests": true
 		},
 		{
+			"importpath": "golang.org/x/sys/unix",
+			"repository": "https://go.googlesource.com/sys",
+			"vcs": "git",
+			"revision": "a646d33e2ee3172a661fc09bca23bb4889a41bc8",
+			"branch": "master",
+			"path": "/unix",
+			"notests": true
+		},
+		{
 			"importpath": "google.golang.org/appengine",
 			"repository": "https://github.com/golang/appengine",
 			"vcs": "git",
 			"revision": "267c27e7492265b84fc6719503b14a1e17975d79",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/alecthomas/kingpin.v2",
+			"repository": "https://gopkg.in/alecthomas/kingpin.v2",
+			"vcs": "git",
+			"revision": "92b2733684bc5f1971162349ce098fe0d070e2a9",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "gopkg.in/square/go-jose.v1",
+			"repository": "https://gopkg.in/square/go-jose.v1",
+			"vcs": "git",
+			"revision": "e3f973b66b91445ec816dd7411ad1b6495a5a2fc",
 			"branch": "master",
 			"notests": true
 		},
