@@ -72,9 +72,6 @@ func main() {
 	if conf.Email == "" {
 		log.Fatalf("'email' must be set in the config file %#v", *confPath)
 	}
-	if conf.HTTPAddr == "" {
-		log.Fatalf("'http_addr' must be set in the config file %#v", *confPath)
-	}
 
 	for i, secConf := range conf.Secrets {
 		if secConf.SecretName == "" {
@@ -176,7 +173,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 		tlsSec := tlsSecs[secConf.SecretName]
 
 		if tlsSec == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, conf.HTTPAddr, alreadyAuthDomains)
+			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
@@ -231,7 +228,7 @@ func storeTLSSecret(cl core13.SecretInterface, sec *kubeapi.Secret, leCert *newC
 	return err
 }
 
-func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sconf *secretConf, httpAddr string, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
 	for _, dom := range sconf.Domains {
 		if alreadyAuthDomains[dom] {
 			continue
@@ -389,9 +386,8 @@ func unmarshalConf(fp string) (*allConf, error) {
 }
 
 type allConf struct {
-	Email    string        `json:"email"`
-	HTTPAddr string        `json:"http_addr"`
-	Secrets  []*secretConf `json:"secrets"`
+	Email   string        `json:"email"`
+	Secrets []*secretConf `json:"secrets"`
 }
 
 type secretConf struct {

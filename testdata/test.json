@@ -1,6 +1,5 @@
 {
   "email": "jeff+lekubetest@somethingsimilar.com",
-  "http_addr": "0.0.0.0:10080",
   "secrets": [
     {
       "namespace": "default",
