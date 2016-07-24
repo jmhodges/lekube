@@ -218,14 +218,12 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 		}
 		return nil, err
 	}
-	// FIXME if both tls.key and tls.crt are missing, just return nil
-	kb, ok := sec.Data["tls.key"]
-	if !ok {
-		return nil, fmt.Errorf("secret %#v has no tls.key", secretName)
-	}
+	// If there's no cert data already in the Secret, we'll assume the user knew
+	// what they were doing and multiple bits of private data inside the same
+	// Secret and so return nil.
 	b, ok := sec.Data["tls.crt"]
 	if !ok {
-		return nil, fmt.Errorf("secret %#v has no tls.crt", secretName)
+		return nil, nil
 	}
 	// This confirms the key and cert parse correctly and are both of the right
 	// types (RSA, ECDSA). Unfortunately, since the Leaf cert isn't kept in the
