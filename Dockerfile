@@ -10,4 +10,4 @@ RUN go install -race github.com/jmhodges/lekube/lekube-fetch && \
     rm -rf /go/src/
 
 # FIXME remove this betweenChecksDur
-CMD ["lekube-fetch", "-conf", "/etc/lekube/lekube.json", "-prod"]
+CMD ["lekube-fetch", "-conf", "/etc/lekube/lekube.json"]
