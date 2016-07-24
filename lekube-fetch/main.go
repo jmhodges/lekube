@@ -267,7 +267,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		}
 		log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
 		responder.AddAuthorization(ch.Token)
-		_, err := cl.Accept(ch)
+		_, err = cl.Accept(ch)
 		if err != nil {
 			return nil, fmt.Errorf("error during Accept of challenge: %s", err)
 		}
