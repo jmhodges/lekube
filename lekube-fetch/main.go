@@ -141,9 +141,7 @@ func main() {
 	}
 	if acc.CurrentTerms != acc.AgreedTerms {
 		acc.AgreedTerms = acc.CurrentTerms
-		// FIXME update reg shouldn't be able to take ep.RegURL
 		err = acmeClient.UpdateReg(acc.URI, acc)
-		log.Printf("current agreement url: %s", acc.CurrentTerms)
 		if err != nil {
 			log.Fatalf("unable to update registration for new agreement terms: %s", err)
 		}
@@ -200,7 +198,6 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 			}
 			err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 			if err != nil {
-				// FIXME handle some other process updating it instead?
 				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 			}
 		}
@@ -457,9 +454,9 @@ type allConf struct {
 
 type secretConf struct {
 	Namespace *string  `json:"namespace"`
-	Name      string   `json:"name"`    // FIXME change to name / name of the secret
-	Domains   []string `json:"domains"` // FIXME check for empty strings
-	UseRSA    bool     // use ECDSA in the certs if false, RSA for certs
+	Name      string   `json:"name"`
+	Domains   []string `json:"domains"`
+	UseRSA    bool     // use ECDSA if not set or if set to false, RSA for certs
 }
 
 func (sconf *secretConf) FullName() nsSecName {
