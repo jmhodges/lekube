@@ -7,8 +7,8 @@
       "domains": ["test.somethingsimilar.com"]
     },
     {
-      "namespace": "staging",
-      "secret_name": "stagingtestsecret",
+      "namespace": "default",
+      "secret_name": "testsecret2",
       "domains": ["test.somethingsimilar.com"]
     }
   ]
