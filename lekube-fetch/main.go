@@ -256,6 +256,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if alreadyAuthDomains[dom] {
 			continue
 		}
+		log.Printf("attempting to authorize %#v", dom)
 		a, err := cl.Authorize(ep.AuthzURL, dom)
 		if err != nil {
 			return nil, err
@@ -264,12 +265,15 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("adding authorization for %#v: token %#v", dom, ch.Token)
 		responder.AddAuthorization(ch.Token)
 		var a2 *acme.Authorization
 		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
 		for time.Now().Before(endTime) {
+			fmt.Println("Looking up auth for %#v: %s", dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
+				fmt.Printf("Valid auth for %#v found", dom)
 				break
 			}
 			// FIXME exponential backoff
