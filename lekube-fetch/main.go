@@ -185,6 +185,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 		okaySecs = append(okaySecs, secConf)
 	}
 	for _, secConf := range okaySecs {
+		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
@@ -286,7 +287,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		var a2 *acme.Authorization
 		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
 		for time.Now().Before(endTime) {
-			log.Printf("Looking up auth for %#v: %s", dom, a.URI)
+			log.Printf("Looking up auth for %s:%s: %s", sconf.FullName(), dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
 				log.Printf("Valid auth for %s:%s found", sconf.FullName(), dom)
