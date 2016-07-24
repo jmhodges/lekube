@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"log"
@@ -24,7 +25,7 @@ type leResponder struct {
 	tokens map[string]tokData
 }
 
-func newLEResponser(accountPubKey interface{}) (*leResponder, error) {
+func newLEResponser(accountPubKey *rsa.PublicKey) (*leResponder, error) {
 	k := jose.JsonWebKey{Key: accountPubKey}
 	thumbprint, err := k.Thumbprint(crypto.SHA256)
 	if err != nil {
