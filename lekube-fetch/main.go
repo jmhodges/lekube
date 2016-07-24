@@ -64,7 +64,11 @@ func main() {
 	stageMetrics.Set("fetchCert", fetchCertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
 
-	secs := make(map[string]bool)
+	type nsSecName struct {
+		ns   string
+		name string
+	}
+	secs := make(map[nsSecName]bool)
 	conf, err := unmarshalConf(*confPath)
 	if err != nil {
 		log.Fatalf("unable to parse config file %#v: %s", *confPath, err)
@@ -80,10 +84,11 @@ func main() {
 		if secConf.Namespace == nil {
 			log.Fatalf("no Namespace given for secret config at index %d in \"secrets\"", i)
 		}
-		if secs[secConf.SecretName] {
+		name := nsSecName{*secConf.Namespace, secConf.SecretName}
+		if secs[name] {
 			log.Fatalf("duplicate config for secret %s", secConf.SecretName)
 		}
-		secs[secConf.SecretName] = true
+		secs[name] = true
 		if len(secConf.Domains) == 0 {
 			log.Fatalf("no domains given for secret %s", secConf.SecretName)
 		}
