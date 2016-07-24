@@ -24,8 +24,8 @@ type leResponder struct {
 	tokens map[string]tokData
 }
 
-func newLEResponser(accountKey crypto.PrivateKey) (*leResponder, error) {
-	k := jose.JsonWebKey{Key: accountKey}
+func newLEResponser(accountPubKey interface{}) (*leResponder, error) {
+	k := jose.JsonWebKey{Key: accountPubKey}
 	thumbprint, err := k.Thumbprint(crypto.SHA256)
 	if err != nil {
 		return nil, err

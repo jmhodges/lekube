@@ -112,7 +112,7 @@ func main() {
 		Key:    accountKey,
 		Client: *httpClient,
 	}
-	responder, err := newLEResponser(accountKey)
+	responder, err := newLEResponser(accountKey.PublicKey)
 	if err != nil {
 		log.Fatalf("unable to make responder: %s", err)
 	}
