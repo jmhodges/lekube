@@ -172,12 +172,15 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 	alreadyAuthDomains := make(map[string]bool)
 
 	for _, secConf := range conf.Secrets {
+		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		tlsSec, err := fetchTLSSecret(client.Secrets(*secConf.Namespace), secConf.SecretName)
 		if err != nil {
 			// FIXME mention tls.crt and tls.key in #config-format
 			recordError(fetchSecret, "unable to fetch TLS secret value %#v: %s", secConf.SecretName, err)
 			continue
 		}
+		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
+
 		tlsSecs[secConf.FullName()] = tlsSec
 		okaySecs = append(okaySecs, secConf)
 	}
