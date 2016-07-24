@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -42,6 +43,8 @@ func newLEResponser(accountKey crypto.PrivateKey) (*leResponder, error) {
 const acmePath = "/.well-known/acme-challenge/"
 
 func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// FIXME remove
+	log.Printf("responder received %s", r.URL.Path)
 	if !strings.HasPrefix(r.URL.Path, acmePath) {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
