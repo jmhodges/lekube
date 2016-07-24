@@ -63,10 +63,6 @@ func main() {
 	stageMetrics.Set("fetchCert", fetchCertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
 
-	type nsSecName struct {
-		ns   string
-		name string
-	}
 	secs := make(map[nsSecName]bool)
 	conf, err := unmarshalConf(*confPath)
 	if err != nil {
@@ -83,7 +79,7 @@ func main() {
 		if secConf.Namespace == nil {
 			log.Fatalf("no Namespace given for secret config at index %d in \"secrets\"", i)
 		}
-		name := nsSecName{*secConf.Namespace, secConf.SecretName}
+		name := secConf.FullName()
 		if secs[name] {
 			log.Fatalf("duplicate config for secret %s", secConf.SecretName)
 		}
@@ -171,7 +167,7 @@ func main() {
 
 func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, client core13.CoreInterface, conf *allConf) {
 	responder.Reset()
-	tlsSecs := make(map[string]*tlsSecret)
+	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	alreadyAuthDomains := make(map[string]bool)
 
@@ -182,11 +178,11 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 			recordError(fetchSecret, "unable to fetch TLS secret value %#v: %s", secConf.SecretName, err)
 			continue
 		}
-		tlsSecs[secConf.SecretName] = tlsSec
+		tlsSecs[secConf.FullName()] = tlsSec
 		okaySecs = append(okaySecs, secConf)
 	}
 	for _, secConf := range okaySecs {
-		tlsSec := tlsSecs[secConf.SecretName]
+		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, alreadyAuthDomains)
@@ -269,7 +265,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if alreadyAuthDomains[dom] {
 			continue
 		}
-		log.Printf("attempting to authorize %#v", dom)
+		log.Printf("attempting to authorize %s:%s:%s", sconf.Namespace, sconf.SecretName, dom)
 		a, err := cl.Authorize(ep.AuthzURL, dom)
 		if err != nil {
 			return nil, err
@@ -290,7 +286,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 			log.Printf("Looking up auth for %#v: %s", dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
-				log.Printf("Valid auth for %#v found", dom)
+				log.Printf("Valid auth for %s:%s:%s found", sconf.Namespace, sconf.SecretName, dom)
 				break
 			}
 			if a2.Status == acme.StatusInvalid {
@@ -309,7 +305,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if a2.Status != acme.StatusValid {
 			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
 		}
-		log.Printf("WORKED %s: %s", dom, a2.URI)
+		log.Printf("WORKED %s:%s:%s: %s", sconf.Namespace, sconf.SecretName, dom, a2.URI)
 		alreadyAuthDomains[dom] = true
 	}
 
@@ -456,6 +452,15 @@ type secretConf struct {
 	SecretName string   `json:"secret_name"` // FIXME change to name / name of the secret
 	Domains    []string `json:"domains"`     // FIXME check for empty strings
 	UseRSA     bool     // use ECDSA in the certs if false, RSA for certs
+}
+
+func (sconf *secretConf) FullName() nsSecName {
+	return nsSecName{*sconf.Namespace, sconf.SecretName}
+}
+
+type nsSecName struct {
+	ns   string
+	name string
 }
 
 func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
