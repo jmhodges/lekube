@@ -190,7 +190,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
 			}
-			oldSec := nil
+			var oldSec *kubeapi.Secret
 			if tlsSec != nil {
 				oldSec = tlsSec.Secret
 			}
@@ -208,7 +208,7 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	sec, err := client.Get(secretName)
 	if err != nil {
 		serr, ok := err.(*kerrors.StatusError)
-		if ok && serr.Reason == unversioned.StatusReasonNotFound {
+		if ok && serr.ErrStatus.Reason == unversioned.StatusReasonNotFound {
 			return nil, nil
 		}
 		return nil, err
