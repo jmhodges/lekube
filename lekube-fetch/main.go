@@ -136,6 +136,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to create new registration: %s", err)
 	}
+	if acc.CurrentTerms != acc.AgreedTerms {
+		acc.AgreedTerms = acc.CurrentTerms
+		err = acmeClient.UpdateReg(ep.RegURL, acc)
+		log.Printf("current agreement url: %s", acc.CurrentTerms)
+		if err != nil {
+			log.Fatalf("unable to update registration for new agreement terms: %s", err)
+		}
+	}
 	ch := make(chan error)
 	go func() {
 		ch <- http.ListenAndServe(*httpAddr, responder)
