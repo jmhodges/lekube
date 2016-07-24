@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenk/backoff"
 	"github.com/google/acme"
-
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	kubeapi "k8s.io/kubernetes/pkg/api/v1"
@@ -287,26 +287,28 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 			return nil, fmt.Errorf("error during Accept of challenge: %s", err)
 		}
 		var a2 *acme.Authorization
-		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
-		for time.Now().Before(endTime) {
+		b := backoff.NewExponentialBackOff()
+		op := func() error {
+			var err error
 			log.Printf("Looking up auth for %s:%s: %s", sconf.FullName(), dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
-			if a2.Status == acme.StatusValid {
-				log.Printf("Valid auth for %s:%s found", sconf.FullName(), dom)
-				break
+			if err != nil {
+				return err
 			}
-			if a2.Status == acme.StatusInvalid {
-				log.Printf("authorization went invalid for %s", dom)
-				break
+			if a2.Status != acme.StatusValid || a2.Status == acme.StatusInvalid {
+				return nil
 			}
-			// FIXME exponential backoff
-			time.Sleep(5 * time.Second)
+			return errors.New("authorization still pending")
 		}
+		err = backoff.Retry(op, b)
 		if err != nil {
 			return nil, err
 		}
 		if a2 == nil {
 			return nil, errors.New("a nil authorization happened somehow")
+		}
+		if a2.Status == acme.StatusInvalid {
+			return nil, fmt.Errorf("authorization marked as invalid")
 		}
 		if a2.Status != acme.StatusValid {
 			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
