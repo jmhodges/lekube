@@ -282,6 +282,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 			}
 			if a2.Status == acme.StatusInvalid {
 				log.Printf("authorization went invalid for %s", dom)
+				break
 			}
 			// FIXME exponential backoff
 			time.Sleep(5 * time.Second)
