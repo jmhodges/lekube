@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"crypto/rsa"
 	"encoding/base64"
-	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -69,24 +68,11 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (lr *leResponder) AddAuthorization(token string) {
 	ka := token + "." + lr.accountKeyThumbprint
-	info := map[string]interface{}{
-		"resource":         "challenge",
-		"type":             "http-01",
-		"keyAuthorization": ka,
-	}
-
-	bb, err := json.Marshal(&info)
-	if err != nil {
-		// This shouldn't happen unless we really screw up the code, so a panic
-		// is fine.
-		panic("unable to marshal key authorization: " + err.Error())
-	}
-
 	notifier := make(chan bool, 1)
 	lr.Lock()
-	log.Printf("adding for real %#v, and body %#v", token, string(bb))
+	log.Printf("adding for real %#v, and body %#v", token, string(ka))
 	lr.tokens[token] = tokData{
-		body:     bb,
+		body:     []byte(ka),
 		notifier: notifier,
 	}
 	lr.Unlock()
