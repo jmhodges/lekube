@@ -265,7 +265,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if alreadyAuthDomains[dom] {
 			continue
 		}
-		log.Printf("attempting to authorize %s:%s:%s", sconf.Namespace, sconf.SecretName, dom)
+		log.Printf("attempting to authorize %s:%s", sconf.FullName(), dom)
 		a, err := cl.Authorize(ep.AuthzURL, dom)
 		if err != nil {
 			return nil, err
@@ -286,7 +286,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 			log.Printf("Looking up auth for %#v: %s", dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
-				log.Printf("Valid auth for %s:%s:%s found", sconf.Namespace, sconf.SecretName, dom)
+				log.Printf("Valid auth for %s:%s found", sconf.FullName(), dom)
 				break
 			}
 			if a2.Status == acme.StatusInvalid {
@@ -305,7 +305,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if a2.Status != acme.StatusValid {
 			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
 		}
-		log.Printf("WORKED %s:%s:%s: %s", sconf.Namespace, sconf.SecretName, dom, a2.URI)
+		log.Printf("WORKED %s:%s: %s", sconf.FullName(), dom, a2.URI)
 		alreadyAuthDomains[dom] = true
 	}
 
@@ -461,6 +461,10 @@ func (sconf *secretConf) FullName() nsSecName {
 type nsSecName struct {
 	ns   string
 	name string
+}
+
+func (nsSecName) String() string {
+	return fmt.Sprintf("%s:%s", *sconf.Namespace, sconf.SecretName)
 }
 
 func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
