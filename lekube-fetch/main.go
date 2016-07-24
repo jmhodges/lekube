@@ -93,21 +93,14 @@ func main() {
 			secConf.Domains[j] = d
 		}
 	}
-	restConfig, err := restclient.InClusterConfig()
-	if err != nil {
-		log.Fatalf("unable to make config for kubernetes client: %s", err)
-	}
-	client := kube13.NewForConfigOrDie(restConfig).Core()
-	tick := time.NewTicker(*betweenChecksDur)
-
-	httpClient := &http.Client{
-		Timeout: 20 * time.Second,
-	}
-
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Fatalf("unable to generate private account key (not a TLS private key) for the Let's Encrypt account: %s", err)
 	}
+	httpClient := &http.Client{
+		Timeout: 20 * time.Second,
+	}
+
 	acmeClient := &acme.Client{
 		Key:    accountKey,
 		Client: *httpClient,
@@ -116,6 +109,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to make responder: %s", err)
 	}
+
+	restConfig, err := restclient.InClusterConfig()
+	if err != nil {
+		log.Fatalf("unable to make config for kubernetes client: %s", err)
+	}
+
+	client := kube13.NewForConfigOrDie(restConfig).Core()
+	tick := time.NewTicker(*betweenChecksDur)
+
 	directoryURL := "https://acme-staging.api.letsencrypt.org/directory"
 	if *useProd {
 		directoryURL = "https://acme-v01.api.letsencrypt.org/directory"
