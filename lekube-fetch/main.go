@@ -12,7 +12,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"expvar"
 	"flag"
 	"fmt"
@@ -427,5 +426,5 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 			return &a.Challenges[comb[0]], nil
 		}
 	}
-	return nil, errors.New("no challenge combination of just http")
+	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %s", a.Challenges, a.Combinations)
 }
