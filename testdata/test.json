@@ -5,6 +5,11 @@
       "namespace": "default",
       "secret_name": "testsecret",
       "domains": ["test.somethingsimilar.com"]
+    },
+    {
+      "namespace": "staging",
+      "secret_name": "stagingtestsecret",
+      "domains": ["test.somethingsimilar.com"]
     }
   ]
 }
