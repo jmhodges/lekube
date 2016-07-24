@@ -47,12 +47,13 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
-	token := r.URL.Path[0:len(acmePath)]
+	token := r.URL.Path[len(acmePath):len(r.URL.Path)]
 	ok := false
 	lr.Lock()
 	tokData, ok := lr.tokens[token]
 	lr.Unlock()
 	if !ok {
+		log.Printf("didn't find %#v in map", token)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -82,6 +83,7 @@ func (lr *leResponder) AddAuthorization(token string) {
 
 	notifier := make(chan bool, 1)
 	lr.Lock()
+	log.Printf("adding for real %#v, and body %#b", token, string(bb))
 	lr.tokens[token] = tokData{
 		body:     bb,
 		notifier: notifier,

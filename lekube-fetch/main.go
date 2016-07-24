@@ -265,12 +265,12 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("adding authorization for %#v: token %#v", dom, ch.Token)
+		fmt.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
 		responder.AddAuthorization(ch.Token)
 		var a2 *acme.Authorization
 		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
 		for time.Now().Before(endTime) {
-			fmt.Println("Looking up auth for %#v: %s", dom, a.URI)
+			fmt.Printf("Looking up auth for %#v: %s", dom, a.URI)
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
 				fmt.Printf("Valid auth for %#v found", dom)
