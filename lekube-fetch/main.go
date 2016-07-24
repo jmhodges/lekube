@@ -41,10 +41,10 @@ var (
 	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
 
 	fetchSecretErrors  = &expvar.Int{}
-	fetchCertErrors    = &expvar.Int{}
+	fetchLECertErrors  = &expvar.Int{}
 	storeSecretErrors  = &expvar.Int{}
 	fetchSecretMetrics = (&expvar.Map{}).Init()
-	fetchCertMetrics   = (&expvar.Map{}).Init()
+	fetchLECertMetrics = (&expvar.Map{}).Init()
 	storeSecretMetrics = (&expvar.Map{}).Init()
 	stageMetrics       = expvar.NewMap("")
 )
@@ -57,10 +57,10 @@ func main() {
 		os.Exit(2)
 	}
 	fetchSecretMetrics.Set("errors", fetchSecretErrors)
-	fetchCertMetrics.Set("errors", fetchCertErrors)
+	fetchLECertMetrics.Set("errors", fetchLECertErrors)
 	storeSecretMetrics.Set("errors", storeSecretErrors)
 	stageMetrics.Set("fetchSecret", fetchSecretMetrics)
-	stageMetrics.Set("fetchCert", fetchCertMetrics)
+	stageMetrics.Set("fetchLECert", fetchLECertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
 
 	secs := make(map[nsSecName]bool)
@@ -173,10 +173,10 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		tlsSec, err := fetchTLSSecret(client.Secrets(*secConf.Namespace), secConf.SecretName)
+		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.SecretName)
 		if err != nil {
 			// FIXME mention tls.crt and tls.key in #config-format
-			recordError(fetchSecret, "unable to fetch TLS secret value %#v: %s", secConf.SecretName, err)
+			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.SecretName, err)
 			continue
 		}
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
@@ -191,24 +191,24 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, alreadyAuthDomains)
 			if err != nil {
-				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
+				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
 			}
 			var oldSec *kubeapi.Secret
 			if tlsSec != nil {
 				oldSec = tlsSec.Secret
 			}
-			err = storeTLSSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
+			err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 			if err != nil {
 				// FIXME handle some other process updating it instead?
-				recordError(storeSecret, "unable to store the TLS cert and key as secret %#v: %s", secConf.SecretName, err)
+				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.SecretName, err)
 			}
 		}
 	}
 }
 
-// fetchTLSSecret may return a nil tlsSecret if no secret was found.
-func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
+// fetchK8SSecret may return a nil tlsSecret if no secret was found.
+func fetchK8SSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
 	sec, err := client.Get(secretName)
 	if err != nil {
 		serr, ok := err.(*kerrors.StatusError)
@@ -233,19 +233,21 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	}
 
 	tlsSec := &tlsSecret{Secret: sec}
-	// Find the leaf cert. The order of the certs is not always well-formed.
+	// Find the leaf cert. The order people store the certs is not always the
+	// correct order, especially if they were doing things manually for a
+	// while. If all of the certs are CA certs, we let ourselves overwrite
+	// tls.crt in the secret.
 	for _, c := range certs {
 		if !c.IsCA {
 			tlsSec.Cert = c
 			break
 		}
 	}
-	// All of the certs were CA certs, so we give up and let ourselves overwrite
-	// tls.crt in the secret.
+
 	return tlsSec, nil
 }
 
-func storeTLSSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
+func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
 	f := cl.Update
 	sec := oldSec
 	if oldSec == nil {
@@ -400,15 +402,15 @@ func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAl
 type stage int
 
 const (
-	fetchSecret stage = iota
-	fetchCert
-	storeSecret
+	fetchSecStage stage = iota
+	fetchLECertStage
+	storeSecStage
 )
 
 var stageErrors = map[stage]*expvar.Int{
-	fetchSecret: fetchSecretErrors,
-	fetchCert:   fetchCertErrors,
-	storeSecret: storeSecretErrors,
+	fetchSecStage:    fetchSecretErrors,
+	fetchLECertStage: fetchLECertErrors,
+	storeSecStage:    storeSecretErrors,
 }
 
 func recordError(st stage, format string, args ...interface{}) {
