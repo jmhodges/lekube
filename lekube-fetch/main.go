@@ -267,8 +267,12 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		}
 		ctx := context.TODO()
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		responder.Authorize(context.TODO(), ch.Token)
+		err = responder.Authorize(context.TODO(), ch.Token)
 		cancel()
+		if err != nil {
+			return nil, err
+		}
+
 		a2, err := cl.GetAuthz(a.URI)
 		if err != nil {
 			return nil, err
