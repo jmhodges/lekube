@@ -9,8 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/net/context"
-
 	jose "gopkg.in/square/go-jose.v1"
 )
 
@@ -67,7 +65,7 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (lr *leResponder) Authorize(ctx context.Context, token string) error {
+func (lr *leResponder) AddAuthorization(token string) {
 	ka := token + "." + lr.accountKeyThumbprint
 	info := map[string]interface{}{
 		"resource":         "challenge",
@@ -77,7 +75,9 @@ func (lr *leResponder) Authorize(ctx context.Context, token string) error {
 
 	bb, err := json.Marshal(&info)
 	if err != nil {
-		return err
+		// This shouldn't happen unless we really screw up the code, so a panic
+		// is fine.
+		panic("unable to marshal key authorization: " + err.Error())
 	}
 
 	notifier := make(chan bool, 1)
@@ -87,12 +87,6 @@ func (lr *leResponder) Authorize(ctx context.Context, token string) error {
 		notifier: notifier,
 	}
 	lr.Unlock()
-	select {
-	case <-notifier:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 func (lr *leResponder) Reset() {

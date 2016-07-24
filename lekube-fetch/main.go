@@ -12,6 +12,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"expvar"
 	"flag"
 	"fmt"
@@ -22,8 +23,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/google/acme"
 
@@ -265,20 +264,25 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if err != nil {
 			return nil, err
 		}
-		ctx := context.TODO()
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
-		err = responder.Authorize(context.TODO(), ch.Token)
-		cancel()
+		responder.AddAuthorization(ch.Token)
+		var a2 *acme.Authorization
+		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
+		for time.Now().Before(t.Add(timeout)) {
+			a2, err = cl.GetAuthz(a.URI)
+			if a2.Status == acme.StatusValid {
+				break
+			}
+			// FIXME exponential backoff
+			time.Sleep(5 * time.Second)
+		}
 		if err != nil {
 			return nil, err
 		}
-
-		a2, err := cl.GetAuthz(a.URI)
-		if err != nil {
-			return nil, err
+		if a2 == nil {
+			return nil, errors.New("a nil authorization happened somehow")
 		}
 		if a2.Status != acme.StatusValid {
-			return nil, fmt.Errorf("unable to authorize for %s: auth status was %#v", dom, a2.Status)
+			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
 		}
 		alreadyAuthDomains[dom] = true
 	}

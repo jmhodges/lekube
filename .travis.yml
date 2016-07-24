@@ -1,0 +1,13 @@
+language: go
+go:
+  - 1.6.2
+
+
+install:
+  - go test -i ./...
+
+script:
+  - go test -v ./...
+  - GOOS=linux ARCH=amd64 go build ./lekube-fetch
+  - docker build -t gcr.io/personal-sites-1295/test-lekube:${TRAVIS_BRANCH}-${TRAVIS_BUILD_NUMBER}-${TRAVIS_COMMIT} .
+  - docker push $REPO
