@@ -138,7 +138,8 @@ func main() {
 	}
 	if acc.CurrentTerms != acc.AgreedTerms {
 		acc.AgreedTerms = acc.CurrentTerms
-		err = acmeClient.UpdateReg(ep.RegURL, acc)
+		// FIXME update reg shouldn't be able to take ep.RegURL
+		err = acmeClient.UpdateReg(acc.URI, acc)
 		log.Printf("current agreement url: %s", acc.CurrentTerms)
 		if err != nil {
 			log.Fatalf("unable to update registration for new agreement terms: %s", err)
