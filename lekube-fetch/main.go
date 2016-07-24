@@ -267,7 +267,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		responder.AddAuthorization(ch.Token)
 		var a2 *acme.Authorization
 		endTime := time.Now().Add(10 * time.Minute) // FIXME config?
-		for time.Now().Before(t.Add(timeout)) {
+		for time.Now().Before(endTime) {
 			a2, err = cl.GetAuthz(a.URI)
 			if a2.Status == acme.StatusValid {
 				break
