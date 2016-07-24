@@ -128,7 +128,8 @@ func main() {
 	// FIXME check for an account being saved already
 	// FIXME support old regs
 	acc := &acme.Account{
-		Contact: []string{fmt.Sprintf("mailto:%s", conf.Email)},
+		Contact:     []string{fmt.Sprintf("mailto:%s", conf.Email)},
+		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
 	}
 
 	err = acmeClient.Register(ep.RegURL, acc)
