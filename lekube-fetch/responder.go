@@ -83,7 +83,7 @@ func (lr *leResponder) AddAuthorization(token string) {
 
 	notifier := make(chan bool, 1)
 	lr.Lock()
-	log.Printf("adding for real %#v, and body %#b", token, string(bb))
+	log.Printf("adding for real %#v, and body %#v", token, string(bb))
 	lr.tokens[token] = tokData{
 		body:     bb,
 		notifier: notifier,
