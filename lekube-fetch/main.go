@@ -467,7 +467,7 @@ type nsSecName struct {
 }
 
 func (n nsSecName) String() string {
-	return fmt.Sprintf("%s:%s", n.Namespace, n.SecretName)
+	return fmt.Sprintf("%s:%s", n.ns, n.name)
 }
 
 func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
