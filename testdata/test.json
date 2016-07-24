@@ -3,17 +3,17 @@
   "secrets": [
     {
       "namespace": "default",
-      "secret_name": "test",
+      "name": "test",
       "domains": ["test.somethingsimilar.com"]
     },
     {
       "namespace": "default",
-      "secret_name": "missingtest",
+      "name": "missingtest",
       "domains": ["test.somethingsimilar.com"]
     },
     {
       "namespace": "staging",
-      "secret_name": "missingtest",
+      "name": "missingtest",
       "domains": ["test.somethingsimilar.com"]
     }
   ]

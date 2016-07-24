@@ -73,19 +73,19 @@ func main() {
 	}
 
 	for i, secConf := range conf.Secrets {
-		if secConf.SecretName == "" {
-			log.Fatalf("no SecretName given for secret config at index %d in \"secrets\"", i)
+		if secConf.Name == "" {
+			log.Fatalf("no Name given for secret config at index %d in \"secrets\"", i)
 		}
 		if secConf.Namespace == nil {
 			log.Fatalf("no Namespace given for secret config at index %d in \"secrets\"", i)
 		}
 		name := secConf.FullName()
 		if secs[name] {
-			log.Fatalf("duplicate config for secret %s", secConf.SecretName)
+			log.Fatalf("duplicate config for secret %s", secConf.Name)
 		}
 		secs[name] = true
 		if len(secConf.Domains) == 0 {
-			log.Fatalf("no domains given for secret %s", secConf.SecretName)
+			log.Fatalf("no domains given for secret %s", secConf.Name)
 		}
 		for j, d := range secConf.Domains {
 			d = strings.TrimSpace(d)
@@ -173,10 +173,10 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.SecretName)
+		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			// FIXME mention tls.crt and tls.key in #config-format
-			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.SecretName, err)
+			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
@@ -191,7 +191,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, alreadyAuthDomains)
 			if err != nil {
-				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
+				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
 				continue
 			}
 			var oldSec *kubeapi.Secret
@@ -201,7 +201,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 			err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 			if err != nil {
 				// FIXME handle some other process updating it instead?
-				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.SecretName, err)
+				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 			}
 		}
 	}
@@ -254,7 +254,7 @@ func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kube
 		f = cl.Create
 		sec = &kubeapi.Secret{
 			ObjectMeta: kubeapi.ObjectMeta{
-				Name: secConf.SecretName,
+				Name: secConf.Name,
 			},
 			Data: make(map[string][]byte),
 		}
@@ -454,14 +454,14 @@ type allConf struct {
 }
 
 type secretConf struct {
-	Namespace  *string  `json:"namespace"`
-	SecretName string   `json:"secret_name"` // FIXME change to name / name of the secret
-	Domains    []string `json:"domains"`     // FIXME check for empty strings
-	UseRSA     bool     // use ECDSA in the certs if false, RSA for certs
+	Namespace *string  `json:"namespace"`
+	Name      string   `json:"name"`    // FIXME change to name / name of the secret
+	Domains   []string `json:"domains"` // FIXME check for empty strings
+	UseRSA    bool     // use ECDSA in the certs if false, RSA for certs
 }
 
 func (sconf *secretConf) FullName() nsSecName {
-	return nsSecName{*sconf.Namespace, sconf.SecretName}
+	return nsSecName{*sconf.Namespace, sconf.Name}
 }
 
 type nsSecName struct {
