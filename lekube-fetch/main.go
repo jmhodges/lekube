@@ -280,6 +280,9 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 				log.Printf("Valid auth for %#v found", dom)
 				break
 			}
+			if a2.Status == acme.StatusInvalid {
+				log.Printf("authorization went invalid for %s", dom)
+			}
 			// FIXME exponential backoff
 			time.Sleep(5 * time.Second)
 		}
