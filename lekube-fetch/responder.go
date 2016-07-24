@@ -70,7 +70,7 @@ func (lr *leResponder) AddAuthorization(token string) {
 	ka := token + "." + lr.accountKeyThumbprint
 	info := map[string]interface{}{
 		"resource":         "challenge",
-		"type":             "http",
+		"type":             "http-01",
 		"keyAuthorization": ka,
 	}
 
