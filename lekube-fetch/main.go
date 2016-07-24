@@ -7,7 +7,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
@@ -189,7 +188,7 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 	for _, secConf := range okaySecs {
 		tlsSec := tlsSecs[secConf.SecretName]
 
-		if tlsSec == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
+		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			leCert, err := fetchLECert(acmeClient, ep, responder, secConf, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
@@ -225,25 +224,25 @@ func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	if !ok {
 		return nil, nil
 	}
-	// This confirms the key and cert parse correctly and are both of the right
-	// types (RSA, ECDSA). Unfortunately, since the Leaf cert isn't kept in the
-	// tls.Certificate (see the docs for tls.X509KeyPair), we have to do that
-	// work again to set it.
-	tcert, err := tls.X509KeyPair(b, kb)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse key pair already in secret %#v, discontinuing to prevent damage: %s", secretName, err)
-	}
 	block, _ := pem.Decode(b)
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse certificates already in secret %#v, discontinuing to prevent damage: %s", secretName, err)
+		// unable to parse certificates already in the Secret, but we don't
+		// actually need it to do our work.
+		return &tlsSecret{Secret: sec}, nil
 	}
-	tcert.Leaf = certs[0]
-	ts := &tlsSecret{
-		Cert:   tcert,
-		Secret: sec,
+
+	tlsSec := &tlsSecret{Secret: sec}
+	// Find the leaf cert. The order of the certs is not always well-formed.
+	for _, c := range certs {
+		if !c.IsCA {
+			tlsSec.Cert = c
+			break
+		}
 	}
-	return ts, nil
+	// All of the certs were CA certs, so we give up and let ourselves overwrite
+	// tls.crt in the secret.
+	return tlsSec, nil
 }
 
 func storeTLSSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
@@ -379,7 +378,7 @@ type newCert struct {
 }
 
 type tlsSecret struct {
-	Cert tls.Certificate
+	Cert *x509.Certificate
 	*kubeapi.Secret
 }
 
@@ -417,15 +416,15 @@ func recordError(st stage, format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-func closeToExpiration(cert tls.Certificate) bool {
+func closeToExpiration(cert *x509.Certificate) bool {
 	t := time.Now().Add(*startRenewDur)
-	return t.Equal(cert.Leaf.NotAfter) || t.After(cert.Leaf.NotAfter)
+	return t.Equal(cert.NotAfter) || t.After(cert.NotAfter)
 }
 
-func domainMismatch(cert tls.Certificate, domains []string) bool {
+func domainMismatch(cert *x509.Certificate, domains []string) bool {
 	cdoms := []string{}
-	cdoms = append(cdoms, cert.Leaf.Subject.CommonName)
-	cdoms = append(cdoms, cert.Leaf.DNSNames...)
+	cdoms = append(cdoms, cert.Subject.CommonName)
+	cdoms = append(cdoms, cert.DNSNames...)
 	sort.Strings(cdoms)
 	doms := make([]string, len(domains))
 	// sort.Strings has side-effects on domains, but fetchLECert uses the order
