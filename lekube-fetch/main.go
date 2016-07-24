@@ -422,7 +422,7 @@ type secretConf struct {
 
 func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 	for _, comb := range a.Combinations {
-		if len(comb) == 1 && a.Challenges[comb[0]].Type == "http" {
+		if len(comb) == 1 && a.Challenges[comb[0]].Type == "simpleHttp" {
 			return &a.Challenges[comb[0]], nil
 		}
 	}
