@@ -8,7 +8,7 @@
     },
     {
       "namespace": "default",
-      "secret_name": "testsecret2",
+      "secret_name": "missingsecret",
       "domains": ["test.somethingsimilar.com"]
     }
   ]
