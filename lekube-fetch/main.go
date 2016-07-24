@@ -296,7 +296,7 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 		if a2.Status != acme.StatusValid {
 			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
 		}
-		log.Printf("WORKED %s", dom)
+		log.Printf("WORKED %s: %s", dom, a2.URI)
 		alreadyAuthDomains[dom] = true
 	}
 
