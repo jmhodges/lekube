@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/acme"
 
+	kerrors "k8s.io/kubernetes/pkg/api/errors"
+	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	kubeapi "k8s.io/kubernetes/pkg/api/v1"
 	kube13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	core13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
@@ -188,7 +190,11 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 				recordError(fetchCert, "unable to get Let's Encrypt certificate for %s: %s", secConf.SecretName, err)
 				continue
 			}
-			err = storeTLSSecret(client.Secrets(*secConf.Namespace), secConf, tlsSec.Secret, leCert)
+			oldSec := nil
+			if tlsSec != nil {
+				oldSec = tlsSec.Secret
+			}
+			err = storeTLSSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 			if err != nil {
 				// FIXME handle some other process updating it instead?
 				recordError(storeSecret, "unable to store the TLS cert and key as secret %#v: %s", secConf.SecretName, err)
@@ -201,7 +207,10 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 func fetchTLSSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
 	sec, err := client.Get(secretName)
 	if err != nil {
-		// FIXME figure out what a 404 looks like
+		serr, ok := err.(*kerrors.StatusError)
+		if ok && serr.Reason == unversioned.StatusReasonNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	// FIXME if both tls.key and tls.crt are missing, just return nil
