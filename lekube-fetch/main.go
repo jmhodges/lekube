@@ -267,48 +267,11 @@ func fetchLECert(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, sco
 			continue
 		}
 		log.Printf("attempting to authorize %s:%s", sconf.FullName(), dom)
-		a, err := cl.Authorize(ep.AuthzURL, dom)
+		a, err := authorizeDomain(cl, ep, responder, dom)
 		if err != nil {
 			return nil, err
 		}
-		ch, err := findChallenge(a)
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
-		responder.AddAuthorization(ch.Token)
-		_, err = cl.Accept(ch)
-		if err != nil {
-			return nil, fmt.Errorf("error during Accept of challenge: %s", err)
-		}
-		var a2 *acme.Authorization
-		b := backoff.NewExponentialBackOff()
-		op := func() error {
-			var err error
-			log.Printf("Looking up auth for %s:%s: %s", sconf.FullName(), dom, a.URI)
-			a2, err = cl.GetAuthz(a.URI)
-			if err != nil {
-				return err
-			}
-			if a2.Status != acme.StatusValid || a2.Status == acme.StatusInvalid {
-				return nil
-			}
-			return errors.New("authorization still pending")
-		}
-		err = backoff.Retry(op, b)
-		if err != nil {
-			return nil, err
-		}
-		if a2 == nil {
-			return nil, errors.New("a nil authorization happened somehow")
-		}
-		if a2.Status == acme.StatusInvalid {
-			return nil, fmt.Errorf("authorization marked as invalid")
-		}
-		if a2.Status != acme.StatusValid {
-			return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
-		}
-		log.Printf("WORKED %s:%s: %s", sconf.FullName(), dom, a2.URI)
+		log.Printf("WORKED %s:%s: %s", sconf.FullName(), dom, a.URI)
 		alreadyAuthDomains[dom] = true
 	}
 
@@ -477,4 +440,48 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 		}
 	}
 	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
+}
+
+func authorizeDomain(cl *acme.Client, ep *acme.Endpoint, responder *leResponder, dom string) (*acme.Authorization, error) {
+	a, err := cl.Authorize(ep.AuthzURL, dom)
+	if err != nil {
+		return nil, err
+	}
+	ch, err := findChallenge(a)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
+	responder.AddAuthorization(ch.Token)
+	_, err = cl.Accept(ch)
+	if err != nil {
+		return nil, fmt.Errorf("error during Accept of challenge: %s", err)
+	}
+	var a2 *acme.Authorization
+	b := backoff.NewExponentialBackOff()
+	op := func() error {
+		var err error
+		a2, err = cl.GetAuthz(a.URI)
+		if err != nil {
+			return err
+		}
+		if a2.Status != acme.StatusValid || a2.Status == acme.StatusInvalid {
+			return nil
+		}
+		return errors.New("authorization still pending")
+	}
+	err = backoff.Retry(op, b)
+	if err != nil {
+		return nil, err
+	}
+	if a2 == nil {
+		return nil, errors.New("a nil authorization happened somehow")
+	}
+	if a2.Status == acme.StatusInvalid {
+		return nil, fmt.Errorf("authorization marked as invalid")
+	}
+	if a2.Status != acme.StatusValid {
+		return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
+	}
+	return a2, nil
 }
