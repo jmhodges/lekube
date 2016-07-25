@@ -81,17 +81,16 @@ func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]
 	if err != nil {
 		return nil, err
 	}
-	cert := []byte{}
+	pemCerts := [][]byte{}
 	for _, c := range certDERs {
 		block := &pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: c,
 		}
-		cert = append(cert, '\n')
-		cert = append(cert, pem.EncodeToMemory(block)...)
+		pemCerts = append(pemCerts, pem.EncodeToMemory(block)...)
 	}
 	nc := &newCert{
-		Cert: cert,
+		Cert: bytes.Join(pemCerts, []byte{'\n'}),
 		Key:  keyOut.Bytes(),
 	}
 	return nc, nil
