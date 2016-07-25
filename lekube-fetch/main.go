@@ -182,7 +182,7 @@ func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
 		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			leCert, err := acmeClient.fetch(secConf, alreadyAuthDomains)
+			leCert, err := acmeClient.createCert(secConf, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
 				continue

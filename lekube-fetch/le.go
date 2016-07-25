@@ -24,7 +24,7 @@ type leClient struct {
 	responder *leResponder
 }
 
-func (lc *leClient) fetch(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
 	for _, dom := range sconf.Domains {
 		if alreadyAuthDomains[dom] {
 			continue
