@@ -128,8 +128,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to discover ACME endpoints: %s", err)
 	}
-	// FIXME check for an account being saved already
-	// FIXME support old regs
+
 	acc := &acme.Account{
 		Contact:     []string{fmt.Sprintf("mailto:%s", conf.Email)},
 		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
@@ -173,7 +172,6 @@ func run(acmeClient *acme.Client, ep *acme.Endpoint, responder *leResponder, cli
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
-			// FIXME mention tls.crt and tls.key in #config-format
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
