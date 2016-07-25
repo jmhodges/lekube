@@ -177,6 +177,7 @@ func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
 		tlsSecs[secConf.FullName()] = tlsSec
 		okaySecs = append(okaySecs, secConf)
 	}
+
 	for _, secConf := range okaySecs {
 		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
