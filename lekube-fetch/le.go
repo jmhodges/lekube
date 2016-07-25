@@ -119,7 +119,7 @@ func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
 		if err != nil {
 			return err
 		}
-		if a2.Status != acme.StatusValid || a2.Status == acme.StatusInvalid {
+		if a2.Status == acme.StatusValid || a2.Status == acme.StatusInvalid {
 			return nil
 		}
 		return errors.New("authorization still pending")
