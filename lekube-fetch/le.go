@@ -87,7 +87,7 @@ func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]
 			Type:  "CERTIFICATE",
 			Bytes: c,
 		}
-		pemCerts = append(pemCerts, pem.EncodeToMemory(block)...)
+		pemCerts = append(pemCerts, pem.EncodeToMemory(block))
 	}
 	nc := &newCert{
 		Cert: bytes.Join(pemCerts, []byte{'\n'}),
