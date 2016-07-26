@@ -10,7 +10,7 @@ if [ -z "${TRAVIS_BRANCH}" ]; then
 fi
 
 if [[ "${TRAVIS_BRANCH}" == "master" || "${TRAVIS_BRANCH}" =~ ^test_docker_push.* ]]; then
-  echo "setting up to push to docker hub"
+  echo "setting up push to docker"
 else
   echo "not on pushable or deployable branch, so no docker work needed"
   exit
