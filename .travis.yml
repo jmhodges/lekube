@@ -18,5 +18,4 @@ install:
 
 script:
   - go test -v ./lekube-fetch
-  - GOOS=linux GOARCH=amd64 go build -o ./lekube-fetch/lekube-fetch ./lekube-fetch
   - ./travis_docker_push.sh
