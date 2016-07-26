@@ -1,15 +1,18 @@
-FROM golang:1.6.3-alpine
+# Can't use alpine because the race detector needs glibc and alpine doesn't seem
+# to have a glibc we can use easily.
+FROM golang:1.6.3
 
-# glibc is required to build with the race detector
-RUN apk add --no-cache glibc-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+		g++ \
+		gcc \
+		libc6-dev \
+		make \
+	&& rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /etc/lekube-fetch
 
 COPY . /go/src/github.com/jmhodges/lekube/
 
-RUN apk add --no-cache gcc && \
-   go install -race github.com/jmhodges/lekube/lekube-fetch && \
-   rm -rf /go/src/ && \
-   apk del gcc
-
+RUN go install github.com/jmhodges/lekube/lekube-fetch && \
+    rm -rf /go/src
 CMD ["lekube-fetch", "-conf", "/etc/lekube/lekube.json"]
