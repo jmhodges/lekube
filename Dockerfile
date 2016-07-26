@@ -1,6 +1,4 @@
-FROM golang
-
-# :1.6.2-alpine
+FROM golang:1.6.2-alpine
 
 RUN mkdir -p /etc/lekube-fetch
 
