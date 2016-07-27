@@ -36,9 +36,6 @@ func newLEResponser(accountPubKey *rsa.PublicKey) (*leResponder, error) {
 const acmePath = "/.well-known/acme-challenge/"
 
 func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// FIXME add verbose
-	log.Printf("responder received %s", r.URL.Path)
-
 	// Google Load Balancers (well, at least from the kubernetes Ingress
 	// API) don't have configurable healthchecks. They also expect / to
 	// always return a 200. So, we special case their user agent.
@@ -46,6 +43,9 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("OK"))
 		return
 	}
+
+	// FIXME add verbose
+	log.Printf("responder received %s", r.URL.Path)
 
 	if !strings.HasPrefix(r.URL.Path, acmePath) {
 		http.Error(w, "Not Found", http.StatusNotFound)
