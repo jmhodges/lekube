@@ -188,6 +188,7 @@ func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
 				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
 				continue
 			}
+			log.Printf("have new cert for %s", secConf.FullName())
 			var oldSec *kubeapi.Secret
 			if tlsSec != nil {
 				oldSec = tlsSec.Secret
@@ -196,6 +197,7 @@ func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
 			if err != nil {
 				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 			}
+			log.Printf("successfully stored new cert in %s", secConf.FullName())
 		}
 	}
 }
