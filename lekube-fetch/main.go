@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 	"time"
 
@@ -305,17 +304,18 @@ func closeToExpiration(cert *x509.Certificate) bool {
 }
 
 func domainMismatch(cert *x509.Certificate, domains []string) bool {
-	cdoms := []string{}
-	cdoms = append(cdoms, cert.Subject.CommonName)
-	cdoms = append(cdoms, cert.DNSNames...)
-	sort.Strings(cdoms)
-	doms := make([]string, len(domains))
-	// sort.Strings has side-effects on domains, but fetchLECert uses the order
-	// to determine which domain should be the common name in the cert. So, we
-	// have to copy domains to doms.
-	copy(doms, domains)
-	sort.Strings(domains)
-	return !reflect.DeepEqual(cdoms, domains)
+	// Since the CommonName can also be in the SAN, let's unique the domains by
+	// using maps instead of sorting some slices.
+	cdoms := make(map[string]struct{})
+	doms := make(map[string]struct{})
+	cdoms[cert.Subject.CommonName] = struct{}{}
+	for _, d := range cert.DNSNames {
+		cdoms[d] = struct{}{}
+	}
+	for _, d := range domains {
+		doms[d] = struct{}{}
+	}
+	return !reflect.DeepEqual(cdoms, doms)
 }
 
 func unmarshalConf(fp string) (*allConf, error) {
