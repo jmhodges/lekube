@@ -25,17 +25,31 @@ type leClient struct {
 }
 
 func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+	type domErr struct {
+		dom string
+		err error
+	}
+	authResps := []chan domErr{}
 	for _, dom := range sconf.Domains {
 		if alreadyAuthDomains[dom] {
 			continue
 		}
 		log.Printf("attempting to authorize %s:%s", sconf.FullName(), dom)
-		a, err := lc.authorizeDomain(dom)
-		if err != nil {
-			return nil, err
+		ch := make(chan domErr, 1)
+		authResps = append(authResps, ch)
+		go func() {
+			a, err := lc.authorizeDomain(dom)
+			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), dom, a.URI)
+			ch <- domErr{dom, err}
+		}()
+	}
+
+	for _, ch := range authResps {
+		de := <-ch
+		if de.err != nil {
+			return nil, de.err
 		}
-		log.Printf("authorized domain %s:%s: %s", sconf.FullName(), dom, a.URI)
-		alreadyAuthDomains[dom] = true
+		alreadyAuthDomains[de.dom] = true
 	}
 
 	if len(sconf.Domains) == 0 {
