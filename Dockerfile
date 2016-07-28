@@ -13,4 +13,4 @@ COPY . /go/src/github.com/jmhodges/lekube/
 
 RUN go install github.com/jmhodges/lekube/lekube-fetch && \
     rm -rf /go/src
-CMD ["lekube-fetch", "-conf", "/etc/lekube/lekube.json"]
+CMD ["lekube-fetch", "-conf", "/etc/lekube/lekube.json", "-prod"]
