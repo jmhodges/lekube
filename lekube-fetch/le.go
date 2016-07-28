@@ -141,15 +141,11 @@ func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
 }
 
 func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAlgorithm) ([]byte, error) {
-	sans := []string{}
-	if len(domains) > 1 {
-		sans = domains[1:len(domains)]
-	}
 	csr := &x509.CertificateRequest{
 		SignatureAlgorithm: sigAlg,
 
 		Subject:  pkix.Name{CommonName: domains[0]},
-		DNSNames: sans,
+		DNSNames: domains,
 	}
 
 	return x509.CreateCertificateRequest(rand.Reader, csr, priv)
