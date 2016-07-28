@@ -141,6 +141,7 @@ func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
 }
 
 func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAlgorithm) ([]byte, error) {
+	log.Println("ugggh domains", domains)
 	csr := &x509.CertificateRequest{
 		SignatureAlgorithm: sigAlg,
 
