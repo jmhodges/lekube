@@ -39,7 +39,11 @@ func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]
 		authResps = append(authResps, ch)
 		go func() {
 			a, err := lc.authorizeDomain(dom)
-			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), dom, a.URI)
+			if err != nil {
+				log.Printf("failed to authorize domain %s:%s: %s", sconf.FullName(), dom, a.URI)
+			} else {
+				log.Printf("authorized domain %s:%s: %s", sconf.FullName(), dom, a.URI)
+			}
 			ch <- domErr{dom, err}
 		}()
 	}
