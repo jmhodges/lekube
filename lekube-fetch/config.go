@@ -59,7 +59,12 @@ func (cl *confLoader) Watch() error {
 				if ev.IsDelete() {
 					continue
 				}
-				cl.load()
+				log.Printf("loading the config")
+				err := cl.load()
+				if err != nil {
+					log.Printf("config load unsuccessful: %s", err)
+				}
+				log.Printf("successfully loaded the config")
 			case dir:
 				if ev.IsDelete() {
 					return fmt.Errorf("unable to continue watching for config, containing dir deleted: %s", ev)
