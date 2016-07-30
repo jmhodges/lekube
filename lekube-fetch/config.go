@@ -50,17 +50,21 @@ func (cl *confLoader) Watch() error {
 	for {
 		select {
 		case ev := <-w.Event:
-			log.Printf("caught config file event (%s), reloading it", ev)
-			if ev.IsCreate() && ev.Name == cl.path {
-				w.Watch(cl.path)
+			log.Printf("caught config file event (%s)", ev)
+			switch ev.Name {
+			case cl.path:
+				if ev.IsCreate() {
+					w.Watch(cl.path)
+				}
+				if ev.IsDelete() {
+					continue
+				}
+				cl.load()
+			case dir:
+				if ev.IsDelete() {
+					return fmt.Errorf("unable to continue watching for config, containing dir deleted: %s", ev)
+				}
 			}
-			if ev.IsDelete() && ev.Name == cl.path {
-				continue
-			}
-			if ev.IsDelete() && ev.Name == dir {
-				return fmt.Errorf("unable to continue watching for config, containing dir deleted: %s", ev)
-			}
-			cl.load()
 		}
 	}
 	return errors.New("should never return")
