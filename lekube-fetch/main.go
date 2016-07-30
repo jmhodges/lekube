@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/google/acme"
@@ -55,38 +54,16 @@ func main() {
 	stageMetrics.Set("fetchLECert", fetchLECertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
 
-	secs := make(map[nsSecName]bool)
-	conf, err := unmarshalConf(*confPath)
+	cLoader, err := newConfLoader(*confPath)
 	if err != nil {
-		log.Fatalf("unable to parse config file %#v: %s", *confPath, err)
+		log.Fatalf("unable to load configuration: %s", err)
 	}
-	if conf.Email == "" {
-		log.Fatalf("'email' must be set in the config file %#v", *confPath)
-	}
-
-	for i, secConf := range conf.Secrets {
-		if secConf.Name == "" {
-			log.Fatalf("no Name given for secret config at index %d in \"secrets\"", i)
+	go func() {
+		err := cLoader.Watch()
+		if err != nil {
+			log.Fatalf("lost the watch on the config file: %s", err)
 		}
-		if secConf.Namespace == nil {
-			log.Fatalf("no Namespace given for secret config at index %d in \"secrets\"", i)
-		}
-		name := secConf.FullName()
-		if secs[name] {
-			log.Fatalf("duplicate config for secret %s", secConf.Name)
-		}
-		secs[name] = true
-		if len(secConf.Domains) == 0 {
-			log.Fatalf("no domains given for secret %s", secConf.Name)
-		}
-		for j, d := range secConf.Domains {
-			d = strings.TrimSpace(d)
-			if d == "" {
-				log.Fatal("empty string in domains of secret config at index %d in \"secrets\"", j)
-			}
-			secConf.Domains[j] = d
-		}
-	}
+	}()
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Fatalf("unable to generate private account key (not a TLS private key) for the Let's Encrypt account: %s", err)
@@ -120,6 +97,7 @@ func main() {
 		log.Fatalf("unable to discover ACME endpoints: %s", err)
 	}
 
+	conf := cLoader.Get()
 	acc := &acme.Account{
 		Contact:     []string{fmt.Sprintf("mailto:%s", conf.Email)},
 		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
@@ -146,9 +124,9 @@ func main() {
 
 	go func() {
 		tick := time.NewTicker(*betweenChecksDur)
-		run(lc, client, conf)
+		run(lc, client, cLoader)
 		for range tick.C {
-			run(lc, client, conf)
+			run(lc, client, cLoader)
 		}
 	}()
 
@@ -158,12 +136,12 @@ func main() {
 	}
 }
 
-func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
+func run(acmeClient *leClient, client core13.CoreInterface, cLoader *confLoader) {
 	acmeClient.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	alreadyAuthDomains := make(map[string]bool)
-
+	conf := cLoader.Get()
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
