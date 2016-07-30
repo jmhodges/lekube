@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -41,10 +42,24 @@ func (cl *confLoader) Watch() error {
 	if err != nil {
 		return err
 	}
+	dir := filepath.Dir(cl.path)
+	err = w.Watch(dir)
+	if err != nil {
+		return err
+	}
 	for {
 		select {
 		case ev := <-w.Event:
 			log.Printf("caught config file event (%s), reloading it", ev)
+			if ev.IsCreate() && ev.Name == cl.path {
+				w.Watch(cl.path)
+			}
+			if ev.IsDelete() && ev.Name == cl.path {
+				continue
+			}
+			if ev.IsDelete() && ev.Name == dir {
+				return fmt.Errorf("unable to continue watching for config, containing dir deleted: %s", ev)
+			}
 			cl.load()
 		}
 	}
