@@ -43,8 +43,8 @@ func (cl *confLoader) Watch() error {
 	}
 	for {
 		select {
-		case <-w.Event:
-			log.Printf("caught config file event (%s), reloading it")
+		case ev := <-w.Event:
+			log.Printf("caught config file event (%s), reloading it", ev)
 			cl.load()
 		}
 	}
