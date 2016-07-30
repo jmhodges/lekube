@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -43,6 +44,7 @@ func (cl *confLoader) Watch() error {
 	for {
 		select {
 		case <-w.Event:
+			log.Printf("caught config file event (%s), reloading it")
 			cl.load()
 		}
 	}
