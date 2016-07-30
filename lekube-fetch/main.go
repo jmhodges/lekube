@@ -181,15 +181,6 @@ func run(acmeClient *leClient, client core13.CoreInterface, conf *allConf) {
 		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
 
-		if tlsSec == nil {
-			log.Printf("fetch for tlsSec is nil")
-		} else if tlsSec.Cert == nil {
-			log.Printf("fetch for tlsSec.Cert is nil")
-		} else if closeToExpiration(tlsSec.Cert) {
-			log.Printf("fetch for closeToExpiration")
-		} else if domainMismatch(tlsSec.Cert, secConf.Domains) {
-			log.Printf("fetch for domainMismatch")
-		}
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			leCert, err := acmeClient.createCert(secConf, alreadyAuthDomains)
 			if err != nil {
