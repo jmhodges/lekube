@@ -78,11 +78,7 @@ func (cl *confLoader) load() error {
 	if h == cl.lastHash {
 		return errSameHash
 	}
-	cl.lastHash = h
-	return cl.set(b)
-}
 
-func (cl *confLoader) set(b []byte) error {
 	conf, err := unmarshalConf(cl.path)
 	if err != nil {
 		return err
@@ -93,6 +89,11 @@ func (cl *confLoader) set(b []byte) error {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
 	cl.conf = conf
+
+	// lastHash is only used in this goroutine, and so doesn't need to be under
+	// the lock. It's only here for clarity and to prevent setting the conf
+	// without setting it.
+	cl.lastHash
 	return nil
 }
 
