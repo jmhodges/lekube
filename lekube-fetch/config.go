@@ -93,7 +93,7 @@ func (cl *confLoader) load() error {
 	// lastHash is only used in this goroutine, and so doesn't need to be under
 	// the lock. It's only here for clarity and to prevent setting the conf
 	// without setting it.
-	cl.lastHash
+	cl.lastHash = h
 	return nil
 }
 
