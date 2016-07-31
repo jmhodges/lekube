@@ -175,6 +175,8 @@ func run(acmeClient *leClient, client core13.CoreInterface, cLoader *confLoader)
 				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 			}
 			log.Printf("successfully stored new cert in %s", secConf.FullName())
+		} else {
+			log.Printf("no work needed for secret %s", secConf.FullName())
 		}
 	}
 }
