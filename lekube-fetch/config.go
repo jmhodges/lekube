@@ -1,13 +1,15 @@
 package main
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/howeyc/fsnotify"
 )
@@ -22,8 +24,10 @@ func newConfLoader(fp string) (*confLoader, error) {
 }
 
 type confLoader struct {
+	path     string
+	lastHash [sha256.Size]byte
+
 	mu   sync.Mutex
-	path string
 	conf *allConf
 }
 
@@ -48,38 +52,37 @@ func (cl *confLoader) Watch() error {
 	if err != nil {
 		return err
 	}
-	for {
-		select {
-		case ev := <-w.Event:
-			log.Printf("caught config file event (%s)", ev)
-			switch ev.Name {
-			case cl.path:
-				if ev.IsCreate() {
-					err := followAndWatchSymlinks(w, cl.path)
-					if err != nil {
-						return err
-					}
-				}
-				if ev.IsDelete() {
-					continue
-				}
-				log.Printf("loading the config")
-				err := cl.load()
-				if err != nil {
-					log.Printf("config load unsuccessful: %s", err)
-				}
-				log.Printf("successfully loaded the config")
-			case dir:
-				if ev.IsDelete() {
-					return fmt.Errorf("unable to continue watching for config, containing dir deleted: %s", ev)
-				}
-			}
+	t := time.NewTicker(5 * time.Minute)
+	for range t.C {
+		err := cl.load()
+		if err == errSameHash {
+			continue
 		}
+		if err != nil {
+			log.Printf("unable to load config file: %s", err)
+			continue
+		}
+		log.Printf("successfully loaded new config file")
 	}
 	return errors.New("should never return")
 }
 
+var errSameHash = errors.New("same hash as last read config file")
+
 func (cl *confLoader) load() error {
+	b, err := ioutil.ReadFile(cl.path)
+	if err != nil {
+		return err
+	}
+	h := sha256.Sum256(b)
+	if h == cl.lastHash {
+		return errSameHash
+	}
+	cl.lastHash = h
+	return cl.set(b)
+}
+
+func (cl *confLoader) set(b []byte) error {
 	conf, err := unmarshalConf(cl.path)
 	if err != nil {
 		return err
@@ -122,28 +125,4 @@ func validateConf(conf *allConf) error {
 		}
 	}
 	return nil
-}
-
-func followAndWatchSymlinks(w *fsnotify.Watcher, name string) error {
-	err := w.Watch(name)
-	if err != nil {
-		return err
-	}
-	fi, err := os.Lstat(name)
-	if err != nil {
-		return err
-	}
-	// Can be sent to a dir that is symlinked.
-	err = w.Watch(filepath.Dir(name))
-	if err != nil {
-		return err
-	}
-	if fi.Mode()&os.ModeSymlink == 0 {
-		return nil
-	}
-	nextName, err := os.Readlink(name)
-	if err != nil {
-		return err
-	}
-	return followAndWatchSymlinks(w, nextName)
 }
