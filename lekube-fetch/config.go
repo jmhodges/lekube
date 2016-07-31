@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -54,7 +55,10 @@ func (cl *confLoader) Watch() error {
 			switch ev.Name {
 			case cl.path:
 				if ev.IsCreate() {
-					w.Watch(cl.path)
+					err := followAndWatchSymlinks(w, cl.path)
+					if err != nil {
+						return err
+					}
 				}
 				if ev.IsDelete() {
 					continue
@@ -118,4 +122,28 @@ func validateConf(conf *allConf) error {
 		}
 	}
 	return nil
+}
+
+func followAndWatchSymlinks(w *fsnotify.Watcher, name string) error {
+	err := w.Watch(name)
+	if err != nil {
+		return err
+	}
+	fi, err := os.Lstat(name)
+	if err != nil {
+		return err
+	}
+	// Can be sent to a dir that is symlinked.
+	err = w.Watch(filepath.Dir(name))
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		return nil
+	}
+	nextName, err := os.Readlink(name)
+	if err != nil {
+		return err
+	}
+	return followAndWatchSymlinks(w, nextName)
 }
