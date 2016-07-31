@@ -52,8 +52,10 @@ func (cl *confLoader) Watch() error {
 	if err != nil {
 		return err
 	}
-	t := time.NewTicker(5 * time.Minute)
-	for range t.C {
+	tickDur := 5 * time.Minute
+	tick := time.NewTicker(tickDur)
+	for range tick.C {
+		t := time.Now()
 		err := cl.load()
 		if err == errSameHash {
 			continue
@@ -62,7 +64,8 @@ func (cl *confLoader) Watch() error {
 			log.Printf("unable to load config file: %s", err)
 			continue
 		}
-		log.Printf("successfully loaded new config file")
+		t = t.Add(tickDur)
+		log.Printf("successfully loaded new config file, will check again around %s")
 	}
 	return errors.New("should never return")
 }
