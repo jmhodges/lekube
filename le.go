@@ -181,11 +181,10 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
 }
 
-// acmeAccountCache allows us to change the ACME (Let's Encrypt) API url and
+// leClientMaker allows us to change the ACME (Let's Encrypt) API url and
 // account email without restarting lekube by creating a new account if need
 // be. It ensures that a) the acme.Client's private key has been registered with
-// the given ACME API and b) the account has a current Terms of Service
-// enabled.
+// the given ACME API and b) the account has a current Terms of Service enabled.
 type leClientMaker struct {
 	httpClient *http.Client
 	accountKey *rsa.PrivateKey
@@ -213,21 +212,21 @@ type clientAndRegURI struct {
 	registrationURI string
 }
 
-func (acm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
+func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	if len(directoryURL) == 0 {
-		return nil, errors.New("directoryURL of ACME (Let's Encrypt) API may not be blank")
+		return nil, errors.New("directoryURL of Let's Encrypt API may not be blank")
 	}
 
 	// Trim trailing slashes off to prevent folks sliding it in and out of their
 	// configs and creating duplicate accounts that we don't need.
 	directoryURL = strings.TrimRight(directoryURL, "/")
 	info := accountInfo{directoryURL, email}
-	lc, ok := acm.infoToClient[info]
+	lc, ok := lcm.infoToClient[info]
 	if ok {
 		return nil, ensureTermsOfUse(lc)
 	}
 
-	ep, err := acme.Discover(acm.httpClient, directoryURL)
+	ep, err := acme.Discover(lcm.httpClient, directoryURL)
 	if err != nil {
 		return nil, fmt.Errorf("unable to discover ACME endpoints at directory URL %s: %s", directoryURL, err)
 	}
@@ -237,8 +236,8 @@ func (acm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
 	}
 	cl := &acme.Client{
-		Key:    acm.accountKey,
-		Client: *acm.httpClient,
+		Key:    lcm.accountKey,
+		Client: *lcm.httpClient,
 	}
 	err = cl.Register(ep.RegURL, acc)
 	if err != nil {
@@ -251,10 +250,10 @@ func (acm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	leClient := &leClient{
 		cl:              cl,
 		ep:              ep,
-		responder:       acm.responder,
+		responder:       lcm.responder,
 		registrationURI: acc.URI,
 	}
-	acm.infoToClient[info] = leClient
+	lcm.infoToClient[info] = leClient
 	return leClient, nil
 }
 
