@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/howeyc/fsnotify"
 )
 
 func newConfLoader(fp string) (*confLoader, error) {
@@ -39,19 +36,6 @@ func (cl *confLoader) Get() *allConf {
 
 // Watch blocks
 func (cl *confLoader) Watch() error {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	err = w.Watch(cl.path)
-	if err != nil {
-		return err
-	}
-	dir := filepath.Dir(cl.path)
-	err = w.Watch(dir)
-	if err != nil {
-		return err
-	}
 	tickDur := 5 * time.Minute
 	tick := time.NewTicker(tickDur)
 	for range tick.C {
