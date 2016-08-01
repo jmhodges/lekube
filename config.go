@@ -88,6 +88,7 @@ func (cl *confLoader) load() error {
 
 type allConf struct {
 	Email   string        `json:"email"`
+	UseProd *bool         `json:"use_prod"`
 	Secrets []*secretConf `json:"secrets"`
 }
 
@@ -111,6 +112,13 @@ func (n nsSecName) String() string {
 	return fmt.Sprintf("%s:%s", n.ns, n.name)
 }
 
+func dirURLFromConf(conf *allConf) string {
+	if *conf.UseProd {
+		return "https://acme-v01.api.letsencrypt.org/directory"
+	}
+	return "https://acme-staging.api.letsencrypt.org/directory"
+}
+
 func unmarshalConf(fp string) (*allConf, error) {
 	f, err := os.Open(fp)
 	if err != nil {
@@ -126,6 +134,11 @@ func validateConf(conf *allConf) error {
 	if conf.Email == "" {
 		return fmt.Errorf("'email' must be set in the config file %#v", *confPath)
 	}
+
+	if conf.UseProd == nil {
+		return fmt.Errorf("'use_prod' must be set to `false` (to use the staging Let's Encrypt API with untrusted certs and higher rate limits), or `true` (to use the production Let's Encrypt API with working certs but much lower rate limits. lekube strongly recommends setting this to `false` until you've seen your staging certs be successfully created.")
+	}
+
 	secs := make(map[nsSecName]bool)
 	for i, secConf := range conf.Secrets {
 		if secConf.Name == "" {
