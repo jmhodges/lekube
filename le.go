@@ -181,11 +181,10 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
 }
 
-// acmeAccountCache allows us to change the ACME (Let's Encrypt) API url and
+// leClientMaker allows us to change the ACME (Let's Encrypt) API url and
 // account email without restarting lekube by creating a new account if need
 // be. It ensures that a) the acme.Client's private key has been registered with
-// the given ACME API and b) the account has a current Terms of Service
-// enabled.
+// the given ACME API and b) the account has a current Terms of Service enabled.
 type leClientMaker struct {
 	httpClient *http.Client
 	accountKey *rsa.PrivateKey
