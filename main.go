@@ -7,14 +7,12 @@ import (
 	"encoding/pem"
 	"expvar"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"reflect"
 	"time"
 
-	"github.com/google/acme"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	kubeapi "k8s.io/kubernetes/pkg/api/v1"
@@ -25,7 +23,6 @@ import (
 
 var (
 	confPath         = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
-	useProd          = flag.Bool("prod", false, "if given, use the production Let's Encrypt API instead of the default staging API")
 	startRenewDur    = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
 	betweenChecksDur = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
 	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
@@ -61,12 +58,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
+	conf := cLoader.Get()
+
 	go func() {
 		err := cLoader.Watch()
 		if err != nil {
 			log.Fatalf("lost the watch on the config file: %s", err)
 		}
 	}()
+
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Fatalf("unable to generate private account key (not a TLS private key) for the Let's Encrypt account: %s", err)
@@ -75,10 +75,6 @@ func main() {
 		Timeout: 20 * time.Second,
 	}
 
-	acmeClient := &acme.Client{
-		Key:    accountKey,
-		Client: *httpClient,
-	}
 	responder, err := newLEResponser(&accountKey.PublicKey)
 	if err != nil {
 		log.Fatalf("unable to make responder: %s", err)
@@ -89,36 +85,13 @@ func main() {
 		log.Fatalf("unable to make config for kubernetes client: %s", err)
 	}
 
-	client := kube13.NewForConfigOrDie(restConfig).Core()
+	kubeClient := kube13.NewForConfigOrDie(restConfig).Core()
 
-	directoryURL := "https://acme-staging.api.letsencrypt.org/directory"
-	if *useProd {
-		directoryURL = "https://acme-v01.api.letsencrypt.org/directory"
-	}
-	ep, err := acme.Discover(httpClient, directoryURL)
+	lcm := newLEClientMaker(httpClient, accountKey, responder)
+	_, err = lcm.Make(dirURLFromConf(conf), conf.Email)
 	if err != nil {
-		log.Fatalf("unable to discover ACME endpoints: %s", err)
+		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
-
-	conf := cLoader.Get()
-	acc := &acme.Account{
-		Contact:     []string{fmt.Sprintf("mailto:%s", conf.Email)},
-		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
-	}
-
-	err = acmeClient.Register(ep.RegURL, acc)
-	if err != nil {
-		log.Fatalf("unable to create new registration: %s", err)
-	}
-	if acc.CurrentTerms != acc.AgreedTerms {
-		acc.AgreedTerms = acc.CurrentTerms
-		err = acmeClient.UpdateReg(acc.URI, acc)
-		if err != nil {
-			log.Fatalf("unable to update registration for new agreement terms: %s", err)
-		}
-	}
-
-	lc := &leClient{cl: acmeClient, ep: &ep, responder: responder}
 
 	ch := make(chan error)
 	go func() {
@@ -127,9 +100,9 @@ func main() {
 
 	go func() {
 		tick := time.NewTicker(*betweenChecksDur)
-		run(lc, client, cLoader)
+		run(lcm, kubeClient, cLoader)
 		for range tick.C {
-			run(lc, client, cLoader)
+			run(lcm, kubeClient, cLoader)
 		}
 	}()
 
@@ -139,8 +112,8 @@ func main() {
 	}
 }
 
-func run(acmeClient *leClient, client core13.CoreInterface, cLoader *confLoader) {
-	acmeClient.responder.Reset()
+func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
+	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	alreadyAuthDomains := make(map[string]bool)
@@ -163,7 +136,12 @@ func run(acmeClient *leClient, client core13.CoreInterface, cLoader *confLoader)
 		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			leCert, err := acmeClient.createCert(secConf, alreadyAuthDomains)
+			acmeClient, err := lcm.Make(dirURLFromConf(conf), conf.Email)
+			if err != nil {
+				recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
+				continue
+			}
+			leCert, err := acmeClient.CreateCert(secConf, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
 				continue

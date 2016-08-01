@@ -4,4 +4,4 @@ FROM golang:1.6.3
 
 COPY ./lekube /go/bin/
 
-CMD ["lekube", "-conf", "/etc/lekube/lekube.json", "-prod"]
+CMD ["lekube", "-conf", "/etc/lekube/lekube.json"]
