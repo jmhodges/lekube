@@ -223,7 +223,7 @@ func (acm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	info := accountInfo{directoryURL, email}
 	lc, ok := acm.infoToClient[info]
 	if ok {
-		return nil, ensureTermsOfUse(lc)
+		return lc, ensureTermsOfUse(lc)
 	}
 
 	ep, err := acme.Discover(acm.httpClient, directoryURL)
