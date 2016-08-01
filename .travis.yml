@@ -14,7 +14,7 @@ branches:
     - /^test-/
 
 install:
-  - go test -i ./lekube-fetch
+  - go test -i .
 
 script:
-  - go test -v ./lekube-fetch && ./travis_docker_push.sh
+  - go test -v . && GOOS=linux GOARCH=amd64 go build . && ./travis_docker_push.sh
