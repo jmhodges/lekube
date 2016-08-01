@@ -34,9 +34,11 @@ var (
 	fetchSecretErrors  = &expvar.Int{}
 	fetchLECertErrors  = &expvar.Int{}
 	storeSecretErrors  = &expvar.Int{}
+	loadConfigErrors   = &expvar.Int{}
 	fetchSecretMetrics = (&expvar.Map{}).Init()
 	fetchLECertMetrics = (&expvar.Map{}).Init()
 	storeSecretMetrics = (&expvar.Map{}).Init()
+	loadConfigMetrics  = (&expvar.Map{}).Init()
 	stageMetrics       = expvar.NewMap("")
 )
 
@@ -50,9 +52,11 @@ func main() {
 	fetchSecretMetrics.Set("errors", fetchSecretErrors)
 	fetchLECertMetrics.Set("errors", fetchLECertErrors)
 	storeSecretMetrics.Set("errors", storeSecretErrors)
+	loadConfigMetrics.Set("errors", loadConfigErrors)
 	stageMetrics.Set("fetchSecret", fetchSecretMetrics)
 	stageMetrics.Set("fetchLECert", fetchLECertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
+	stageMetrics.Set("loadConfig", loadConfigMetrics)
 
 	cLoader, err := newConfLoader(*confPath)
 	if err != nil {
@@ -256,12 +260,14 @@ const (
 	fetchSecStage stage = iota
 	fetchLECertStage
 	storeSecStage
+	loadConfigStage
 )
 
 var stageErrors = map[stage]*expvar.Int{
 	fetchSecStage:    fetchSecretErrors,
 	fetchLECertStage: fetchLECertErrors,
 	storeSecStage:    storeSecretErrors,
+	loadConfigStage:  loadConfigErrors,
 }
 
 func recordError(st stage, format string, args ...interface{}) {
