@@ -61,7 +61,7 @@ func (cl *confLoader) Watch() error {
 			continue
 		}
 		if err != nil {
-			log.Printf("unable to load config file in watch goroutine: %s", err)
+			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 			continue
 		}
 		t = t.Add(tickDur)
