@@ -13,18 +13,21 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 
 	"github.com/cenk/backoff"
 	"github.com/google/acme"
 )
 
 type leClient struct {
-	cl        *acme.Client
-	ep        *acme.Endpoint
-	responder *leResponder
+	cl              *acme.Client
+	ep              acme.Endpoint
+	responder       *leResponder
+	registrationURI string
 }
 
-func (lc *leClient) createCert(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func (lc *leClient) CreateCert(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
 	type domErr struct {
 		dom string
 		err error
@@ -176,4 +179,100 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 		}
 	}
 	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
+}
+
+// acmeAccountCache allows us to change the ACME (Let's Encrypt) API url and
+// account email without restarting lekube by creating a new account if need
+// be. It ensures that a) the acme.Client's private key has been registered with
+// the given ACME API and b) the account has a current Terms of Service
+// enabled.
+type leClientMaker struct {
+	httpClient *http.Client
+	accountKey *rsa.PrivateKey
+	responder  *leResponder
+
+	infoToClient map[accountInfo]*leClient
+}
+
+func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leResponder) *leClientMaker {
+	return &leClientMaker{
+		httpClient:   c,
+		accountKey:   accountKey,
+		responder:    responder,
+		infoToClient: make(map[accountInfo]*leClient),
+	}
+}
+
+type accountInfo struct {
+	directoryURL string
+	email        string
+}
+
+type clientAndRegURI struct {
+	leClient        *leClient
+	registrationURI string
+}
+
+func (acm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
+	if len(directoryURL) == 0 {
+		return nil, errors.New("directoryURL of ACME (Let's Encrypt) API may not be blank")
+	}
+
+	// Trim trailing slashes off to prevent folks sliding it in and out of their
+	// configs and creating duplicate accounts that we don't need.
+	directoryURL = strings.TrimRight(directoryURL, "/")
+	info := accountInfo{directoryURL, email}
+	lc, ok := acm.infoToClient[info]
+	if ok {
+		return nil, ensureTermsOfUse(lc)
+	}
+
+	ep, err := acme.Discover(acm.httpClient, directoryURL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to discover ACME endpoints at directory URL %s: %s", directoryURL, err)
+	}
+
+	acc := &acme.Account{
+		Contact:     []string{"mailto:" + email},
+		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
+	}
+	cl := &acme.Client{
+		Key:    acm.accountKey,
+		Client: *acm.httpClient,
+	}
+	err = cl.Register(ep.RegURL, acc)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create new registration: %s", err)
+	}
+	err = refreshTermsOfUse(cl, acc)
+	if err != nil {
+		return nil, err
+	}
+	leClient := &leClient{
+		cl:              cl,
+		ep:              ep,
+		responder:       acm.responder,
+		registrationURI: acc.URI,
+	}
+	acm.infoToClient[info] = leClient
+	return leClient, nil
+}
+
+func ensureTermsOfUse(lc *leClient) error {
+	acc, err := lc.cl.GetReg(lc.registrationURI)
+	if err != nil {
+		return fmt.Errorf("unable to refresh account info while determining most recent Terms of Service: %s", err)
+	}
+	return refreshTermsOfUse(lc.cl, acc)
+}
+
+func refreshTermsOfUse(cl *acme.Client, acc *acme.Account) error {
+	if acc.CurrentTerms != acc.AgreedTerms {
+		acc.AgreedTerms = acc.CurrentTerms
+		err := cl.UpdateReg(acc.URI, acc)
+		if err != nil {
+			return fmt.Errorf("unable to update registration for new agreement terms: %s", err)
+		}
+	}
+	return nil
 }
