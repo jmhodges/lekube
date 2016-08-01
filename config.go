@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -82,6 +84,42 @@ func (cl *confLoader) load() error {
 	// without setting it.
 	cl.lastHash = h
 	return nil
+}
+
+type allConf struct {
+	Email   string        `json:"email"`
+	Secrets []*secretConf `json:"secrets"`
+}
+
+type secretConf struct {
+	Namespace *string  `json:"namespace"`
+	Name      string   `json:"name"`
+	Domains   []string `json:"domains"`
+	UseRSA    bool     // use ECDSA if not set or if set to false, RSA for certs
+}
+
+func (sconf *secretConf) FullName() nsSecName {
+	return nsSecName{*sconf.Namespace, sconf.Name}
+}
+
+type nsSecName struct {
+	ns   string
+	name string
+}
+
+func (n nsSecName) String() string {
+	return fmt.Sprintf("%s:%s", n.ns, n.name)
+}
+
+func unmarshalConf(fp string) (*allConf, error) {
+	f, err := os.Open(fp)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	conf := &allConf{}
+	err = json.NewDecoder(f).Decode(conf)
+	return conf, err
 }
 
 func validateConf(conf *allConf) error {

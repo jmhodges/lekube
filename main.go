@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"expvar"
 	"flag"
@@ -293,40 +292,4 @@ func domainMismatch(cert *x509.Certificate, domains []string) bool {
 		doms[d] = struct{}{}
 	}
 	return !reflect.DeepEqual(cdoms, doms)
-}
-
-func unmarshalConf(fp string) (*allConf, error) {
-	f, err := os.Open(fp)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	conf := &allConf{}
-	err = json.NewDecoder(f).Decode(conf)
-	return conf, err
-}
-
-type allConf struct {
-	Email   string        `json:"email"`
-	Secrets []*secretConf `json:"secrets"`
-}
-
-type secretConf struct {
-	Namespace *string  `json:"namespace"`
-	Name      string   `json:"name"`
-	Domains   []string `json:"domains"`
-	UseRSA    bool     // use ECDSA if not set or if set to false, RSA for certs
-}
-
-func (sconf *secretConf) FullName() nsSecName {
-	return nsSecName{*sconf.Namespace, sconf.Name}
-}
-
-type nsSecName struct {
-	ns   string
-	name string
-}
-
-func (n nsSecName) String() string {
-	return fmt.Sprintf("%s:%s", n.ns, n.name)
 }
