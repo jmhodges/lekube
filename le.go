@@ -232,8 +232,7 @@ func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	}
 
 	acc := &acme.Account{
-		Contact:     []string{"mailto:" + email},
-		AgreedTerms: "https://letsencrypt.org/documents/LE-SA-v1.0.1-July-27-2015.pdf",
+		Contact: []string{"mailto:" + email},
 	}
 	cl := &acme.Client{
 		Key:    lcm.accountKey,
