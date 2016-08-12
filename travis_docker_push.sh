@@ -25,8 +25,7 @@ docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS || die "unable to 
 # unless running on a test_docker_push branch
 DEPLOY_IMAGE="$REPO:${TRAVIS_BUILD_NUMBER}-${TRAVIS_BRANCH}-${SHA}"
 
-docker build -f Dockerfile -t $REPO .
-docker tag $REPO:$COMMIT ${DEPLOY_IMAGE} || die "unable to tag as ${DEPLOY_IMAGE}"
+docker build -f Dockerfile -t ${DEPLOY_IMAGE} . || die "unable to build as ${DEPLOY_IMAGE}"
 
 echo "Pushing image to docker hub: ${DEPLOY_IMAGE}"
 docker push $REPO || die "unable to push docker tags"
