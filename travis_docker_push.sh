@@ -12,7 +12,7 @@ fi
 if [[ ("${TRAVIS_BRANCH}" == "master" && "${TRAVIS_PULL_REQUEST}" == "false")|| "${TRAVIS_BRANCH}" =~ ^test_docker_push.* ]]; then
   echo "setting up push to docker"
 else
-  echo "not on pushable or deployable branch, so no docker work needed"
+  echo "not on pushable branch, so no docker work needed"
   exit
 fi
 
