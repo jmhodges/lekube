@@ -31,6 +31,8 @@ var (
 	fetchLECertErrors  = &expvar.Int{}
 	storeSecretErrors  = &expvar.Int{}
 	loadConfigErrors   = &expvar.Int{}
+	runCount           = &expvar.Int{}
+	errorCount         = &expvar.Int{}
 	fetchSecretMetrics = (&expvar.Map{}).Init()
 	fetchLECertMetrics = (&expvar.Map{}).Init()
 	storeSecretMetrics = (&expvar.Map{}).Init()
@@ -53,6 +55,8 @@ func main() {
 	stageMetrics.Set("fetchLECert", fetchLECertMetrics)
 	stageMetrics.Set("storeSecret", storeSecretMetrics)
 	stageMetrics.Set("loadConfig", loadConfigMetrics)
+	stageMetrics.Set("runs", runCount)
+	stageMetrics.Set("errors", errorCount)
 
 	cLoader, err := newConfLoader(*confPath)
 	if err != nil {
@@ -113,6 +117,7 @@ func main() {
 }
 
 func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
+	runCount.Add(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
@@ -248,6 +253,7 @@ var stageErrors = map[stage]*expvar.Int{
 }
 
 func recordError(st stage, format string, args ...interface{}) {
+	errorCount.Add(1)
 	stageErrors[st].Add(1)
 	log.Printf(format, args...)
 }
