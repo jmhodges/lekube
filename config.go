@@ -13,6 +13,16 @@ import (
 	"time"
 )
 
+// newConfLoader does IO immediately to validate the config file at the
+// path. This is not ideal for all purposes, but works here for the following
+// reasons. Since Watch being is called in a background goroutine, it finding an
+// error in the congig file will race with Let's Encrypt account creation. That
+// means that every time it has to crash from the Watch going bad, we could be
+// making a new LE account on the next boot. That's unkind and will get the
+// process rate limited. But we also don't want the process to boot up in a
+// state that is obviously invalid since people running this the first time
+// might not know they screwed the config file up. So, take the L and load the
+// config file here.
 func newConfLoader(fp string) (*confLoader, error) {
 	cl := &confLoader{path: fp}
 	err := cl.load()
@@ -96,7 +106,7 @@ type secretConf struct {
 	Namespace *string  `json:"namespace"`
 	Name      string   `json:"name"`
 	Domains   []string `json:"domains"`
-	UseRSA    bool     // use ECDSA if not set or if set to false, RSA for certs
+	UseRSA    bool     `json:"use_rsa"` // use ECDSA if not set or if set to false, RSA for certs
 }
 
 func (sconf *secretConf) FullName() nsSecName {
@@ -145,7 +155,7 @@ func validateConf(conf *allConf) error {
 			return fmt.Errorf("no Name given for secret config at index %d in \"secrets\"", i)
 		}
 		if secConf.Namespace == nil {
-			return fmt.Errorf("no Namespace given for secret config at index %d in \"secrets\"", i)
+			return fmt.Errorf("no Namespace given for secret config at index %d in \"secrets\" (is allowed to be the empty string)", i)
 		}
 		name := secConf.FullName()
 		if secs[name] {

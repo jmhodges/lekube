@@ -1,19 +1,26 @@
 {
-  "email": "jeff+lekubetest@somethingsimilar.com",
+  "email": "fake@example.com",
+  "use_prod": true,
   "secrets": [
     {
       "namespace": "default",
       "name": "test",
-      "domains": ["test.example.com"]
+      "domains": ["example.com"]
     },
     {
       "namespace": "default",
       "name": "missingtest",
-      "domains": ["test.example.com"]
+      "use_rsa": true,
+      "domains": ["www.example.com", "alt.example.com"]
     },
     {
       "namespace": "staging",
       "name": "missingtest",
+      "domains": ["test.example.com"]
+    },
+    {
+      "namespace": "",
+      "name": "nonamespace",
       "domains": ["test.example.com"]
     }
   ]
