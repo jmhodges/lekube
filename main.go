@@ -99,17 +99,14 @@ func main() {
 		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
 
-	if conf.LocalDebugOnly {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if isBlockedRequest(r) {
-				http.NotFound(w, r)
-				return
-			}
-			responder.ServeHTTP(w, r)
-		})
-	} else {
-		http.Handle("/", responder)
-	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		conf := cLoader.Get()
+		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
+			http.NotFound(w, r)
+			return
+		}
+		responder.ServeHTTP(w, r)
+	})
 
 	ch := make(chan error)
 	go func() {
