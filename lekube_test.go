@@ -18,6 +18,9 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	if !*c.UseProd {
 		t.Errorf("use_prod: want %t, got %t", true, *c.UseProd)
 	}
+	if !c.LocalDebugOnly {
+		t.Errorf("local_debug_only: want %t, got %t", true, c.LocalDebugOnly)
+	}
 	defaultNS := "default"
 	stagingNS := "staging"
 	emptyNS := ""
