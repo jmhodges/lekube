@@ -106,6 +106,10 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
+		if r.URL.Path == "/debug/build" {
+			w.Write([]byte("SHA: " + buildSHA))
+			return
+		}
 		http.DefaultServeMux.ServeHTTP(w, r)
 	})
 
