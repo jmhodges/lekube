@@ -97,9 +97,15 @@ func main() {
 		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
 
+	http.Handle("/", responder)
+	var h http.Handler
+	if conf.LocalDebugOnly {
+		h = responder
+	}
+
 	ch := make(chan error)
 	go func() {
-		ch <- http.ListenAndServe(*httpAddr, responder)
+		ch <- http.ListenAndServe(*httpAddr, h)
 	}()
 
 	go func() {
