@@ -40,6 +40,7 @@ var (
 	storeSecretMetrics = (&expvar.Map{}).Init()
 	loadConfigMetrics  = (&expvar.Map{}).Init()
 	stageMetrics       = expvar.NewMap("")
+	buildSHA           = "<debug>"
 )
 
 func main() {
@@ -105,6 +106,10 @@ func main() {
 		log.Printf("in / handler: %#v %t %s %s", conf, r.URL.Path, r.RemoteAddr, r.Header.Get("User-Agent"))
 		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
 			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Path == "/debug/build" {
+			w.Write([]byte("SHA: " + buildSHA))
 			return
 		}
 		http.DefaultServeMux.ServeHTTP(w, r)
