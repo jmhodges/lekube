@@ -102,7 +102,7 @@ func main() {
 	m := http.NewServeMux()
 	m.HandleFunc("/debug/", func(w http.ResponseWriter, r *http.Request) {
 		conf := cLoader.Get()
-		log.Printf("in / handler: %q %t %t %s %s", conf, conf.AllowRemoteDebug, isBlockedRequest(r), r.URL.Path, r.RemoteAddr)
+		log.Printf("in / handler: %#v %t %s %s", conf, conf.AllowRemoteDebug, r.URL.Path, r.RemoteAddr)
 		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
 			http.NotFound(w, r)
 			return
