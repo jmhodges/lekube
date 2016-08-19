@@ -1,6 +1,7 @@
 {
   "email": "fake@example.com",
   "use_prod": true,
+  "allow_remote_debug": true,
   "secrets": [
     {
       "namespace": "default",

@@ -8,9 +8,11 @@ import (
 	"expvar"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
@@ -97,9 +99,18 @@ func main() {
 		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
 
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		conf := cLoader.Get()
+		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
+			http.NotFound(w, r)
+			return
+		}
+		responder.ServeHTTP(w, r)
+	})
+
 	ch := make(chan error)
 	go func() {
-		ch <- http.ListenAndServe(*httpAddr, responder)
+		ch <- http.ListenAndServe(*httpAddr, nil)
 	}()
 
 	go func() {
@@ -276,4 +287,15 @@ func domainMismatch(cert *x509.Certificate, domains []string) bool {
 		doms[d] = struct{}{}
 	}
 	return !reflect.DeepEqual(cdoms, doms)
+}
+
+func isBlockedRequest(r *http.Request) bool {
+	if r.URL.Path == "/debug" || strings.HasPrefix(r.URL.Path, "/debug/") {
+		i := strings.Index(r.RemoteAddr, ":")
+		if i < 0 {
+			return false
+		}
+		return !net.ParseIP(r.RemoteAddr[:i]).IsLoopback()
+	}
+	return false
 }

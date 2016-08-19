@@ -97,9 +97,10 @@ func (cl *confLoader) load() error {
 }
 
 type allConf struct {
-	Email   string        `json:"email"`
-	UseProd *bool         `json:"use_prod"`
-	Secrets []*secretConf `json:"secrets"`
+	Email            string        `json:"email"`
+	UseProd          *bool         `json:"use_prod"`
+	AllowRemoteDebug bool          `json:"allow_remote_debug"`
+	Secrets          []*secretConf `json:"secrets"`
 }
 
 type secretConf struct {
