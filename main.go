@@ -290,6 +290,7 @@ func domainMismatch(cert *x509.Certificate, domains []string) bool {
 }
 
 func isBlockedRequest(r *http.Request) bool {
+	log.Println("blocked request check", r.URL.Path, r.RemoteAddr)
 	if r.URL.Path == "/debug" || strings.HasPrefix(r.URL.Path, "/debug/") {
 		i := strings.Index(r.RemoteAddr, ":")
 		if i < 0 {
