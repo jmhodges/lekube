@@ -109,9 +109,7 @@ func main() {
 		http.DefaultServeMux.ServeHTTP(w, r)
 	})
 
-	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		responder.ServeHTTP(w, r)
-	})
+	m.Handle("/", responder)
 
 	ch := make(chan error)
 	go func() {
