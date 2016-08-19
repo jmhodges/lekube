@@ -106,12 +106,14 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
+		if r.URL.Path == "/debug/build" {
+			w.Write([]byte("SHA: " + buildSHA))
+			return
+		}
 		http.DefaultServeMux.ServeHTTP(w, r)
 	})
 
-	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		responder.ServeHTTP(w, r)
-	})
+	m.Handle("/", responder)
 
 	ch := make(chan error)
 	go func() {
