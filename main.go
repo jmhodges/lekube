@@ -65,6 +65,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
+	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
+	loadConfigMetrics.Set("last_config_set", cLoader.lastSet)
+
 	conf := cLoader.Get()
 
 	go func() {
