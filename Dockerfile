@@ -1,6 +1,6 @@
 # Can't use alpine because the race detector needs glibc and alpine doesn't seem
 # to have a glibc we can use easily.
-FROM golang:1.6.3
+FROM golang
 
 COPY ./lekube /go/bin/
 
