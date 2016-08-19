@@ -101,7 +101,7 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		conf := cLoader.Get()
-		log.Printf("in / handler: %#v %t %s %s", conf, conf.AllowRemoteDebug, r.URL.Path, r.RemoteAddr)
+		log.Printf("in / handler: %#v %t %s %s", conf, r.URL.Path, r.RemoteAddr, r.Header.Get("User-Agent"))
 		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
 			http.NotFound(w, r)
 			return
