@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"reflect"
 	"testing"
 )
@@ -54,6 +55,34 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	for i, sec := range secs {
 		if !reflect.DeepEqual(sec, c.Secrets[i]) {
 			t.Errorf("secret %d: want %#v, got %#v", i, sec, c.Secrets[i])
+		}
+	}
+}
+
+func TestBlockedRequest(t *testing.T) {
+	type testcase struct {
+		path       string
+		remoteAddr string
+		blocked    bool
+	}
+	tests := []testcase{
+		{"/debug", "93.184.216.34", true},
+		{"/debug/", "93.184.216.34", true},
+		{"/debug/foobar", "93.184.216.34", true},
+		{"/", "93.184.216.34", false},
+		{"/foobar", "93.184.216.34", false},
+		{"/debug", "127.0.0.1", false},
+		{"/debug/", "127.0.0.1", false},
+		{"/debug/foobar", "127.0.0.1", false},
+		{"/", "127.0.0.1", false},
+		{"/foobar", "127.0.0.1", false},
+	}
+	for _, tc := range tests {
+		r := httptest.NewRequest("GET", tc.path, nil)
+		r.RemoteAddr = tc.remoteAddr + ":1111"
+		actual := isBlockedRequest(r)
+		if actual != tc.blocked {
+			t.Errorf("path %s, remote addr %s: want %t, got %t", tc.path, r.RemoteAddr, tc.blocked, actual)
 		}
 	}
 }
