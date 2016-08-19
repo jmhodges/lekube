@@ -17,4 +17,4 @@ install:
   - go test -i .
 
 script:
-  - go test . && GOOS=linux GOARCH=amd64 go build . && ./travis_docker_push.sh
+  - go test . && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.buildSHA=${SHA}" . && ./travis_docker_push.sh

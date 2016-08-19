@@ -40,6 +40,7 @@ var (
 	storeSecretMetrics = (&expvar.Map{}).Init()
 	loadConfigMetrics  = (&expvar.Map{}).Init()
 	stageMetrics       = expvar.NewMap("")
+	buildSHA           = "<debug>"
 )
 
 func main() {
@@ -64,6 +65,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
+	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
+	loadConfigMetrics.Set("last_config_set", cLoader.lastSet)
+
 	conf := cLoader.Get()
 
 	go func() {
@@ -104,6 +108,10 @@ func main() {
 		conf := cLoader.Get()
 		if !conf.AllowRemoteDebug && isBlockedRequest(r) {
 			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Path == "/debug/build" {
+			w.Write([]byte("SHA: " + buildSHA))
 			return
 		}
 		http.DefaultServeMux.ServeHTTP(w, r)

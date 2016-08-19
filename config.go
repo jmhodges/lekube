@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -24,7 +25,11 @@ import (
 // might not know they screwed the config file up. So, take the L and load the
 // config file here.
 func newConfLoader(fp string) (*confLoader, error) {
-	cl := &confLoader{path: fp}
+	cl := &confLoader{
+		path:      fp,
+		lastCheck: &expvar.Int{},
+		lastSet:   &expvar.Int{},
+	}
 	err := cl.load()
 	if err != nil {
 		return nil, err
@@ -33,8 +38,10 @@ func newConfLoader(fp string) (*confLoader, error) {
 }
 
 type confLoader struct {
-	path     string
-	lastHash [sha256.Size]byte
+	path      string
+	lastCheck *expvar.Int
+	lastSet   *expvar.Int
+	lastHash  [sha256.Size]byte
 
 	mu   sync.Mutex
 	conf *allConf
@@ -69,6 +76,7 @@ func (cl *confLoader) Watch() error {
 var errSameHash = errors.New("same hash as last read config file")
 
 func (cl *confLoader) load() error {
+	cl.lastCheck.Set(time.Now().UnixNano())
 	b, err := ioutil.ReadFile(cl.path)
 	if err != nil {
 		return err
@@ -93,6 +101,8 @@ func (cl *confLoader) load() error {
 	// the lock. It's only here for clarity and to prevent setting the conf
 	// without setting it.
 	cl.lastHash = h
+
+	cl.lastSet.Set(time.Now().UnixNano())
 	return nil
 }
 
