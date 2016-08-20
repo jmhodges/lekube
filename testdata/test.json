@@ -2,6 +2,7 @@
   "email": "fake@example.com",
   "use_prod": true,
   "allow_remote_debug": true,
+  "tls_dir": "./testdata/tls",
   "secrets": [
     {
       "namespace": "default",

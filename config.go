@@ -111,6 +111,7 @@ type allConf struct {
 	UseProd          *bool         `json:"use_prod"`
 	AllowRemoteDebug bool          `json:"allow_remote_debug"`
 	Secrets          []*secretConf `json:"secrets"`
+	TLSDir           string        `json:"tls_dir"`
 }
 
 type secretConf struct {
