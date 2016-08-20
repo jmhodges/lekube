@@ -19,7 +19,7 @@ fi
 REPO=jmhodges/lekube
 SHA=$(git rev-parse --short HEAD)
 
-docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS || die "unable to login"
+docker login -u $DOCKER_USER -p $DOCKER_PASS || die "unable to login"
 
 # DEPLOY_IMAGE is usually something like jmhodges/lekube:master-ffffff-48
 # unless running on a test_docker_push branch
