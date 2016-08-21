@@ -114,20 +114,6 @@ func main() {
 	m.Handle("/", responder)
 
 	go func() {
-		var err error
-		if conf.TLSDir == "" {
-			err = http.ListenAndServe(*httpAddr, m)
-		} else {
-			crt := filepath.Join(conf.TLSDir, "tls.crt")
-			key := filepath.Join(conf.TLSDir, "tls.key")
-			err = http.ListenAndServeTLS(*httpAddr, crt, key, m)
-		}
-		if err != nil {
-			log.Fatalf("unable to boot server: %s", err)
-		}
-	}()
-
-	go func() {
 		tick := time.NewTicker(*betweenChecksDur)
 		run(lcm, kubeClient, cLoader)
 		for range tick.C {
@@ -141,6 +127,17 @@ func main() {
 			log.Fatalf("lost the watch on the config file: %s", err)
 		}
 	}()
+
+	if conf.TLSDir == "" {
+		err = http.ListenAndServe(*httpAddr, m)
+	} else {
+		crt := filepath.Join(conf.TLSDir, "tls.crt")
+		key := filepath.Join(conf.TLSDir, "tls.key")
+		err = http.ListenAndServeTLS(*httpAddr, crt, key, m)
+	}
+	if err != nil {
+		log.Fatalf("unable to boot server: %s", err)
+	}
 }
 
 func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
