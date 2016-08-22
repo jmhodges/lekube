@@ -29,6 +29,7 @@ var (
 	startRenewDur    = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
 	betweenChecksDur = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
 	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
+	httpsAddr        = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
 
 	fetchSecretErrors  = &expvar.Int{}
 	fetchLECertErrors  = &expvar.Int{}
@@ -128,15 +129,20 @@ func main() {
 		}
 	}()
 
-	if conf.TLSDir == "" {
-		err = http.ListenAndServe(*httpAddr, m)
-	} else {
-		crt := filepath.Join(conf.TLSDir, "tls.crt")
-		key := filepath.Join(conf.TLSDir, "tls.key")
-		err = http.ListenAndServeTLS(*httpAddr, crt, key, m)
+	if conf.TLSDir != "" {
+		go func() {
+			crt := filepath.Join(conf.TLSDir, "tls.crt")
+			key := filepath.Join(conf.TLSDir, "tls.key")
+			err := http.ListenAndServeTLS(*httpsAddr, crt, key, m)
+			if err != nil {
+				log.Fatalf("unable to boot HTTPS server: %s", err)
+			}
+		}()
 	}
+
+	err = http.ListenAndServe(*httpAddr, m)
 	if err != nil {
-		log.Fatalf("unable to boot server: %s", err)
+		log.Fatalf("unable to boot HTTP server: %s", err)
 	}
 }
 
