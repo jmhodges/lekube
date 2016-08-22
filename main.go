@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -70,13 +71,6 @@ func main() {
 
 	conf := cLoader.Get()
 
-	go func() {
-		err := cLoader.Watch()
-		if err != nil {
-			log.Fatalf("lost the watch on the config file: %s", err)
-		}
-	}()
-
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Fatalf("unable to generate private account key (not a TLS private key) for the Let's Encrypt account: %s", err)
@@ -119,11 +113,6 @@ func main() {
 
 	m.Handle("/", responder)
 
-	ch := make(chan error)
-	go func() {
-		ch <- http.ListenAndServe(*httpAddr, m)
-	}()
-
 	go func() {
 		tick := time.NewTicker(*betweenChecksDur)
 		run(lcm, kubeClient, cLoader)
@@ -132,9 +121,22 @@ func main() {
 		}
 	}()
 
-	err = <-ch
+	go func() {
+		err := cLoader.Watch()
+		if err != nil {
+			log.Fatalf("lost the watch on the config file: %s", err)
+		}
+	}()
+
+	if conf.TLSDir == "" {
+		err = http.ListenAndServe(*httpAddr, m)
+	} else {
+		crt := filepath.Join(conf.TLSDir, "tls.crt")
+		key := filepath.Join(conf.TLSDir, "tls.key")
+		err = http.ListenAndServeTLS(*httpAddr, crt, key, m)
+	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("unable to boot server: %s", err)
 	}
 }
 

@@ -111,6 +111,7 @@ type allConf struct {
 	UseProd          *bool         `json:"use_prod"`
 	AllowRemoteDebug bool          `json:"allow_remote_debug"`
 	Secrets          []*secretConf `json:"secrets"`
+	TLSDir           string        `json:"tls_dir"`
 }
 
 type secretConf struct {
@@ -157,7 +158,7 @@ func validateConf(conf *allConf) error {
 	}
 
 	if conf.UseProd == nil {
-		return fmt.Errorf("'use_prod' must be set to `false` (to use the staging Let's Encrypt API with untrusted certs and higher rate limits), or `true` (to use the production Let's Encrypt API with working certs but much lower rate limits. lekube strongly recommends setting this to `false` until you've seen your staging certs be successfully created.")
+		return fmt.Errorf("'use_prod' must be set to `false` or `true`. `false will mean use the staging Let's Encrypt API (which has untrusted certs and higher rate limits), and `true` means use the production Let's Encrypt API with working certs but much lower rate limits. lekube strongly recommends setting this to `false` until you've seen your staging certs be successfully created.")
 	}
 
 	secs := make(map[nsSecName]bool)
