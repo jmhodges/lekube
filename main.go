@@ -31,6 +31,7 @@ var (
 	betweenChecksDur = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
 	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
 	httpsAddr        = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
+	leTimeout        = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
 	fetchSecretErrors  = &expvar.Int{}
 	fetchLECertErrors  = &expvar.Int{}
@@ -119,9 +120,9 @@ func main() {
 
 	go func() {
 		tick := time.NewTicker(*betweenChecksDur)
-		run(lcm, kubeClient, cLoader)
+		run(lcm, kubeClient, cLoader, *leTimeout)
 		for range tick.C {
-			run(lcm, kubeClient, cLoader)
+			run(lcm, kubeClient, cLoader, *leTimeout)
 		}
 	}()
 
@@ -149,7 +150,7 @@ func main() {
 	}
 }
 
-func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
+func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader, leTimeout time.Duration) {
 	runCount.Add(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
@@ -174,7 +175,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
 		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 			acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 			if err != nil {
 				recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
@@ -182,7 +183,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
 			}
 			leCert, err := acmeClient.CreateCert(ctx, secConf, alreadyAuthDomains)
 			if err != nil {
-				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
+				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 				continue
 			}
 			log.Printf("have new cert for %s", secConf.FullName())
