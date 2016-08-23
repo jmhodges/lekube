@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -93,10 +94,12 @@ func main() {
 	kubeClient := kube13.NewForConfigOrDie(restConfig).Core()
 
 	lcm := newLEClientMaker(httpClient, accountKey, responder)
-	_, err = lcm.Make(dirURLFromConf(conf), conf.Email)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	_, err = lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
 		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
+	cancel()
 
 	m := http.NewServeMux()
 	m.HandleFunc("/debug/", func(w http.ResponseWriter, r *http.Request) {
@@ -171,12 +174,13 @@ func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
 		tlsSec := tlsSecs[secConf.FullName()]
 
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			acmeClient, err := lcm.Make(dirURLFromConf(conf), conf.Email)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 			if err != nil {
 				recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
 				continue
 			}
-			leCert, err := acmeClient.CreateCert(secConf, alreadyAuthDomains)
+			leCert, err := acmeClient.CreateCert(ctx, secConf, alreadyAuthDomains)
 			if err != nil {
 				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.Name, err)
 				continue
@@ -191,6 +195,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader) {
 				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 			}
 			log.Printf("successfully stored new cert in %s", secConf.FullName())
+			cancel()
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
 		}

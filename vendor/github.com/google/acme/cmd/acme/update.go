@@ -14,6 +14,9 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"time"
+
+	"golang.org/x/net/context"
 
 	"github.com/google/acme"
 )
@@ -52,8 +55,11 @@ func runUpdate(args []string) {
 	}
 
 	client := acme.Client{Key: uc.key}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	if updateAccept {
-		a, err := client.GetReg(uc.URI)
+		a, err := client.GetReg(ctx, uc.URI)
 		if err != nil {
 			fatalf(err.Error())
 		}
@@ -64,9 +70,11 @@ func runUpdate(args []string) {
 		uc.Contact = args
 	}
 
-	if err := client.UpdateReg(uc.URI, &uc.Account); err != nil {
+	a, err := client.UpdateReg(ctx, &uc.Account)
+	if err != nil {
 		fatalf(err.Error())
 	}
+	uc.Account = *a
 	if err := writeConfig(uc); err != nil {
 		fatalf("write config: %v", err)
 	}
