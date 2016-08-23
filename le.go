@@ -29,9 +29,14 @@ type leClient struct {
 }
 
 func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+	if len(sconf.Domains) == 0 {
+		return nil, fmt.Errorf("cannot request a certificate with no names")
+	}
+
 	type domErr struct {
-		dom string
-		err error
+		dom     string
+		err     error
+		authURI string
 	}
 	authResps := []chan domErr{}
 	for _, dom := range sconf.Domains {
@@ -43,25 +48,34 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 		authResps = append(authResps, ch)
 		go func(dom string) {
 			a, err := lc.authorizeDomain(ctx, dom)
-			if err != nil {
-				log.Printf("failed to authorize domain %s:%s: %s", sconf.FullName(), dom, err)
-			} else {
-				log.Printf("authorized domain %s:%s: %s", sconf.FullName(), dom, a.URI)
+			de := domErr{dom: dom, err: err}
+			if err == nil {
+				de.authURI = a.URI
 			}
-			ch <- domErr{dom, err}
+			ch <- de
 		}(dom)
 	}
 
+	errs := []string{}
 	for _, ch := range authResps {
-		de := <-ch
-		if de.err != nil {
-			return nil, de.err
+		var de domErr
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case de = <-ch:
 		}
-		alreadyAuthDomains[de.dom] = true
+
+		if de.err == nil {
+			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), de.dom, de.authURI)
+			alreadyAuthDomains[de.dom] = true
+		} else {
+			msg := fmt.Sprintf("failed to authorize domain %s:%s: %s", sconf.FullName(), de.dom, de.err)
+			errs = append(errs, msg)
+		}
 	}
 
-	if len(sconf.Domains) == 0 {
-		return nil, fmt.Errorf("cannot request a certificate with no names")
+	if len(errs) != 0 {
+		return nil, fmt.Errorf("%s", errs)
 	}
 
 	var priv crypto.PrivateKey
