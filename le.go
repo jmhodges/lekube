@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -22,12 +23,12 @@ import (
 
 type leClient struct {
 	cl              *acme.Client
-	ep              acme.Endpoint
-	responder       *leResponder
+	dir             acme.Directory
 	registrationURI string
+	responder       *leResponder
 }
 
-func (lc *leClient) CreateCert(sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
 	type domErr struct {
 		dom string
 		err error
@@ -41,7 +42,7 @@ func (lc *leClient) CreateCert(sconf *secretConf, alreadyAuthDomains map[string]
 		ch := make(chan domErr, 1)
 		authResps = append(authResps, ch)
 		go func(dom string) {
-			a, err := lc.authorizeDomain(dom)
+			a, err := lc.authorizeDomain(ctx, dom)
 			if err != nil {
 				log.Printf("failed to authorize domain %s:%s: %s", sconf.FullName(), dom, err)
 			} else {
@@ -98,7 +99,7 @@ func (lc *leClient) CreateCert(sconf *secretConf, alreadyAuthDomains map[string]
 		return nil, err
 	}
 
-	certDERs, _, err := lc.cl.CreateCert(lc.ep.CertURL, csrDER, 0, true)
+	certDERs, _, err := lc.cl.CreateCert(ctx, csrDER, 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +118,8 @@ func (lc *leClient) CreateCert(sconf *secretConf, alreadyAuthDomains map[string]
 	return nc, nil
 }
 
-func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
-	a, err := lc.cl.Authorize(lc.ep.AuthzURL, dom)
+func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Authorization, error) {
+	a, err := lc.cl.Authorize(ctx, dom)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +129,7 @@ func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
 	}
 	log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
 	lc.responder.AddAuthorization(ch.Token)
-	_, err = lc.cl.Accept(ch)
+	_, err = lc.cl.Accept(ctx, ch)
 	if err != nil {
 		return nil, fmt.Errorf("error during Accept of challenge: %s", err)
 	}
@@ -136,7 +137,7 @@ func (lc *leClient) authorizeDomain(dom string) (*acme.Authorization, error) {
 	b := backoff.NewExponentialBackOff()
 	op := func() error {
 		var err error
-		a2, err = lc.cl.GetAuthz(a.URI)
+		a2, err = lc.cl.GetAuthorization(ctx, a.URI)
 		if err != nil {
 			return err
 		}
@@ -175,7 +176,7 @@ func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAl
 func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 	for _, comb := range a.Combinations {
 		if len(comb) == 1 && a.Challenges[comb[0]].Type == "http-01" {
-			return &a.Challenges[comb[0]], nil
+			return a.Challenges[comb[0]], nil
 		}
 	}
 	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
@@ -212,7 +213,7 @@ type clientAndRegURI struct {
 	registrationURI string
 }
 
-func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
+func (lcm *leClientMaker) Make(ctx context.Context, directoryURL, email string) (*leClient, error) {
 	if len(directoryURL) == 0 {
 		return nil, errors.New("directoryURL of Let's Encrypt API may not be blank")
 	}
@@ -223,10 +224,15 @@ func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	info := accountInfo{directoryURL, email}
 	lc, ok := lcm.infoToClient[info]
 	if ok {
-		return lc, ensureTermsOfUse(lc)
+		return lc, ensureTermsOfUse(ctx, lc)
 	}
 
-	ep, err := acme.Discover(lcm.httpClient, directoryURL)
+	cl := &acme.Client{
+		Key:          lcm.accountKey,
+		HTTPClient:   lcm.httpClient,
+		DirectoryURL: directoryURL,
+	}
+	dir, err := cl.Discover(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to discover ACME endpoints at directory URL %s: %s", directoryURL, err)
 	}
@@ -234,21 +240,13 @@ func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	acc := &acme.Account{
 		Contact: []string{"mailto:" + email},
 	}
-	cl := &acme.Client{
-		Key:    lcm.accountKey,
-		Client: *lcm.httpClient,
-	}
-	err = cl.Register(ep.RegURL, acc)
+	acc, err = cl.Register(ctx, acc, acme.AcceptTOS)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create new registration: %s", err)
 	}
-	err = refreshTermsOfUse(cl, acc)
-	if err != nil {
-		return nil, err
-	}
 	leClient := &leClient{
 		cl:              cl,
-		ep:              ep,
+		dir:             dir,
 		responder:       lcm.responder,
 		registrationURI: acc.URI,
 	}
@@ -256,18 +254,15 @@ func (lcm *leClientMaker) Make(directoryURL, email string) (*leClient, error) {
 	return leClient, nil
 }
 
-func ensureTermsOfUse(lc *leClient) error {
-	acc, err := lc.cl.GetReg(lc.registrationURI)
+func ensureTermsOfUse(ctx context.Context, lc *leClient) error {
+	acc, err := lc.cl.GetReg(ctx, lc.registrationURI)
 	if err != nil {
 		return fmt.Errorf("unable to refresh account info while determining most recent Terms of Service: %s", err)
 	}
-	return refreshTermsOfUse(lc.cl, acc)
-}
 
-func refreshTermsOfUse(cl *acme.Client, acc *acme.Account) error {
 	if acc.CurrentTerms != acc.AgreedTerms {
 		acc.AgreedTerms = acc.CurrentTerms
-		err := cl.UpdateReg(acc.URI, acc)
+		_, err := lc.cl.UpdateReg(ctx, acc)
 		if err != nil {
 			return fmt.Errorf("unable to update registration for new agreement terms: %s", err)
 		}
