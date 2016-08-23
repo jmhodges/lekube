@@ -70,7 +70,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), de.dom, de.authURI)
 			alreadyAuthDomains[de.dom] = true
 		} else {
-			msg := fmt.Sprintf("failed to authorize domain %s:%s: %s", sconf.FullName(), de.dom, de.err)
+			msg := fmt.Sprintf("failed to authorize domain %s: %s", sconf.FullName(), de.dom, de.err)
 			errs = append(errs, msg)
 		}
 	}
