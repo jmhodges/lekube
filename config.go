@@ -68,7 +68,7 @@ func (cl *confLoader) Watch() error {
 			continue
 		}
 		t = t.Add(tickDur)
-		log.Printf("successfully loaded new config file. next check will be around around %s")
+		log.Printf("successfully loaded new config file. next check will be around %s", t)
 	}
 	return errors.New("should never return")
 }
