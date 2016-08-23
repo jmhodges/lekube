@@ -71,7 +71,7 @@
 			"importpath": "github.com/google/acme",
 			"repository": "https://github.com/google/acme",
 			"vcs": "git",
-			"revision": "ba87e98560afb779c71677ab09bcb0f6733d9c91",
+			"revision": "400805812f216beb48a7f1b5bfdeee9acd85cee1",
 			"branch": "master",
 			"notests": true
 		},
