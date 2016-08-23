@@ -32,6 +32,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 	if len(sconf.Domains) == 0 {
 		return nil, fmt.Errorf("cannot request a certificate with no names")
 	}
+	domains := uniqueDomains(sconf.Domains)
 
 	type domErr struct {
 		dom     string
@@ -39,7 +40,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 		authURI string
 	}
 	authResps := []chan domErr{}
-	for _, dom := range sconf.Domains {
+	for _, dom := range domains {
 		if alreadyAuthDomains[dom] {
 			continue
 		}
@@ -282,4 +283,18 @@ func ensureTermsOfUse(ctx context.Context, lc *leClient) error {
 		}
 	}
 	return nil
+}
+
+// uniqueDomains removes duplicate domains by removing any duplicates after the
+// first, avoiding accidental order changes that might affect the CN.
+func uniqueDomains(doms []string) []string {
+	ds := make(map[string]bool)
+	newDoms := []string{}
+	for _, d := range doms {
+		if !ds[d] {
+			newDoms = append(newDoms, d)
+			ds[d] = true
+		}
+	}
+	return newDoms
 }
