@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -64,6 +65,7 @@ func main() {
 	stageMetrics.Set("loadConfig", loadConfigMetrics)
 	stageMetrics.Set("runs", runCount)
 	stageMetrics.Set("errors", errorCount)
+	expvar.Publish("stages", stageMetrics)
 
 	cLoader, err := newConfLoader(*confPath)
 	if err != nil {
