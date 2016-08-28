@@ -4,8 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -28,17 +30,23 @@ func newConfLoader(fp string) (*confLoader, *allConf, error) {
 		path:       fp,
 		lastCheck:  &unixEpoch{},
 		lastChange: &unixEpoch{},
+		attempts:   &expvar.Int{},
+		successes:  &expvar.Int{},
 	}
 	err := cl.load()
 	if err != nil {
+		loadConfigErrors.Add(1)
 		return nil, nil, err
 	}
+	cl.successes.Add(1)
 	return cl, cl.Get(), nil
 }
 
 type confLoader struct {
 	path      string
 	lastCheck *unixEpoch
+	attempts  *expvar.Int
+	successes *expvar.Int
 
 	// loadMu locks calls to confLoader.load, but doesn't prevent concurrent
 	// reads of confLoader.conf. This allows us to prevent multiple reads of the
@@ -66,11 +74,18 @@ func (cl *confLoader) Get() *allConf {
 // the config cannot be read or it does not parse or validate, it is not
 // returned and Watch continues to block.
 func (cl *confLoader) Watch() *allConf {
+	var prevErr error
 	for {
+		cl.attempts.Add(1)
 		start := time.Now()
 		err := cl.load()
 		c := cl.Get()
 		if err == nil {
+			if prevErr != nil {
+				log.Printf("previous config file error resolved and load was successful")
+			}
+			prevErr = nil
+			cl.successes.Add(1)
 			return c
 		}
 
@@ -81,7 +96,23 @@ func (cl *confLoader) Watch() *allConf {
 		waitDur = time.Duration(c.ConfigCheckInterval)
 		next := start.Add(waitDur)
 
-		if err != errSameHash {
+		prevLoadSuccessful := prevErr == nil
+		if err == errSameHash {
+			if prevLoadSuccessful {
+				// If the last load where the config had actually changed was
+				// successful, then the good conf remained in place in this load
+				// and we can record it as a success.
+				cl.successes.Add(1)
+			} else {
+				// If the last load where the config had actually changed was in
+				// error, then the bad conf remained, so we can record this load
+				// as an error. However, we don't want the logs consumed
+				// entirely with repeated error messages, so just increment the
+				// stat.
+				loadConfigErrors.Add(1)
+			}
+		} else {
+			prevErr = err
 			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 		}
 		time.Sleep(next.Sub(start))

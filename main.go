@@ -33,20 +33,28 @@ var (
 	startRenewDur = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
 	httpAddr      = flag.String("addr", ":10080", "address to boot the HTTP server on")
 	httpsAddr     = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
-	leTimeout     = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
+	leTimeoutDur  = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
-	fetchSecretErrors  = &expvar.Int{}
-	fetchLECertErrors  = &expvar.Int{}
-	storeSecretErrors  = &expvar.Int{}
-	loadConfigErrors   = &expvar.Int{}
-	runCount           = &expvar.Int{}
-	errorCount         = &expvar.Int{}
-	fetchSecretMetrics = (&expvar.Map{}).Init()
-	fetchLECertMetrics = (&expvar.Map{}).Init()
-	storeSecretMetrics = (&expvar.Map{}).Init()
-	loadConfigMetrics  = (&expvar.Map{}).Init()
-	stageMetrics       = expvar.NewMap("")
-	buildSHA           = "<debug>"
+	fetchSecretAttempts  = &expvar.Int{}
+	fetchLECertAttempts  = &expvar.Int{}
+	storeSecretAttempts  = &expvar.Int{}
+	loadConfigAttempts   = &expvar.Int{}
+	fetchSecretErrors    = &expvar.Int{}
+	fetchLECertErrors    = &expvar.Int{}
+	storeSecretErrors    = &expvar.Int{}
+	loadConfigErrors     = &expvar.Int{}
+	fetchSecretSuccesses = &expvar.Int{}
+	fetchLECertSuccesses = &expvar.Int{}
+	storeSecretSuccesses = &expvar.Int{}
+	loadConfigSuccesses  = &expvar.Int{}
+	runCount             = &expvar.Int{}
+	errorCount           = &expvar.Int{}
+	fetchSecretMetrics   = (&expvar.Map{}).Init()
+	fetchLECertMetrics   = (&expvar.Map{}).Init()
+	storeSecretMetrics   = (&expvar.Map{}).Init()
+	loadConfigMetrics    = (&expvar.Map{}).Init()
+	stageMetrics         = expvar.NewMap("")
+	buildSHA             = "<debug>"
 )
 
 func main() {
@@ -56,22 +64,37 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	fetchSecretMetrics.Set("errors", fetchSecretErrors)
-	fetchLECertMetrics.Set("errors", fetchLECertErrors)
-	storeSecretMetrics.Set("errors", storeSecretErrors)
-	loadConfigMetrics.Set("errors", loadConfigErrors)
-	stageMetrics.Set("fetchSecret", fetchSecretMetrics)
-	stageMetrics.Set("fetchLECert", fetchLECertMetrics)
-	stageMetrics.Set("storeSecret", storeSecretMetrics)
-	stageMetrics.Set("loadConfig", loadConfigMetrics)
-	stageMetrics.Set("runs", runCount)
-	stageMetrics.Set("errors", errorCount)
-	expvar.Publish("stages", stageMetrics)
 
 	cLoader, conf, err := newConfLoader(*confPath)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
+
+	fetchSecretMetrics.Set("attempts", fetchSecretAttempts)
+	fetchLECertMetrics.Set("attempts", fetchLECertAttempts)
+	storeSecretMetrics.Set("attempts", storeSecretAttempts)
+	loadConfigMetrics.Set("attempts", cLoader.attempts)
+
+	fetchSecretMetrics.Set("errors", fetchSecretErrors)
+	fetchLECertMetrics.Set("errors", fetchLECertErrors)
+	storeSecretMetrics.Set("errors", storeSecretErrors)
+	loadConfigMetrics.Set("errors", loadConfigErrors)
+
+	fetchSecretMetrics.Set("successes", fetchSecretSuccesses)
+	fetchLECertMetrics.Set("successes", fetchLECertSuccesses)
+	storeSecretMetrics.Set("successes", storeSecretSuccesses)
+	loadConfigMetrics.Set("successes", cLoader.successes)
+
+	stageMetrics.Set("fetch_secret", fetchSecretMetrics)
+	stageMetrics.Set("fetch_le_Cert", fetchLECertMetrics)
+	stageMetrics.Set("store_secret", storeSecretMetrics)
+	stageMetrics.Set("load_config", loadConfigMetrics)
+
+	stageMetrics.Set("runs", runCount)
+	stageMetrics.Set("errors", errorCount)
+
+	expvar.Publish("stages", stageMetrics)
+
 	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
 	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
 	loadConfigMetrics.Set("last_config_change", cLoader.lastChange)
@@ -122,10 +145,10 @@ func main() {
 	m.Handle("/", responder)
 
 	go func() {
-		run(lcm, kubeClient, conf, *leTimeout)
+		run(lcm, kubeClient, conf, *leTimeoutDur)
 		for {
 			conf := cLoader.Watch()
-			run(lcm, kubeClient, conf, *leTimeout)
+			run(lcm, kubeClient, conf, *leTimeoutDur)
 		}
 	}()
 
@@ -151,51 +174,63 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
-	alreadyAuthDomains := make(map[string]bool)
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
+		fetchSecretAttempts.Add(1)
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
+		fetchSecretSuccesses.Add(1)
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
 
 		tlsSecs[secConf.FullName()] = tlsSec
 		okaySecs = append(okaySecs, secConf)
 	}
 
+	alreadyAuthDomains := make(map[string]bool)
 	for _, secConf := range okaySecs {
 		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
-
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
-			ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
-			acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
-			if err != nil {
-				recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
-				continue
-			}
-			leCert, err := acmeClient.CreateCert(ctx, secConf, alreadyAuthDomains)
-			if err != nil {
-				recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
-				continue
-			}
-			log.Printf("have new cert for %s", secConf.FullName())
-			var oldSec *kubeapi.Secret
-			if tlsSec != nil {
-				oldSec = tlsSec.Secret
-			}
-			err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
-			if err != nil {
-				recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
-			}
-			log.Printf("successfully stored new cert in %s", secConf.FullName())
-			cancel()
+			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
 		}
+
 	}
+}
+func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
+	defer cancel()
+
+	fetchLECertAttempts.Add(1)
+	acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
+	if err != nil {
+		recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
+		return
+	}
+	leCert, err := acmeClient.CreateCert(ctx, secConf, alreadyAuthDomains)
+	if err != nil {
+		recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
+		return
+	}
+	fetchLECertSuccesses.Add(1)
+	log.Printf("have new cert for %s", secConf.FullName())
+	var oldSec *kubeapi.Secret
+	if tlsSec != nil {
+		oldSec = tlsSec.Secret
+	}
+
+	storeSecretAttempts.Add(1)
+	err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
+	if err != nil {
+		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
+		return
+	}
+	storeSecretSuccesses.Add(1)
+	log.Printf("successfully stored new cert in %s", secConf.FullName())
 }
 
 // fetchK8SSecret may return a nil tlsSecret if no secret was found.
