@@ -53,7 +53,7 @@ var (
 	fetchLECertMetrics   = (&expvar.Map{}).Init()
 	storeSecretMetrics   = (&expvar.Map{}).Init()
 	loadConfigMetrics    = (&expvar.Map{}).Init()
-	stageMetrics         = expvar.NewMap("")
+	stageMetrics         = expvar.NewMap("stages")
 	buildSHA             = "<debug>"
 )
 
@@ -92,8 +92,6 @@ func main() {
 
 	stageMetrics.Set("runs", runCount)
 	stageMetrics.Set("errors", errorCount)
-
-	expvar.Publish("stages", stageMetrics)
 
 	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
 	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
