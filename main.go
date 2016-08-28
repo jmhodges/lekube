@@ -15,7 +15,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
@@ -72,7 +74,9 @@ func main() {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
 	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
-	loadConfigMetrics.Set("last_config_set", cLoader.lastSet)
+	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
+	loadConfigMetrics.Set("last_config_change", cLoader.lastChange)
+	loadConfigMetrics.Set("last_config_change_str", unixTime{unixEpoch: cLoader.lastChange})
 
 	conf := cLoader.Get()
 
@@ -325,4 +329,30 @@ func isBlockedRequest(r *http.Request) bool {
 		return !net.ParseIP(r.RemoteAddr[:i]).IsLoopback()
 	}
 	return false
+}
+
+var _ expvar.Var = &unixEpoch{}
+var _ expvar.Var = &unixTime{}
+
+// unixEpoch is a nanoseconds since Unix epoch variable that satisfies the expvar.Var interface.
+type unixEpoch struct {
+	i int64
+}
+
+func (v *unixEpoch) String() string {
+	return strconv.FormatInt(atomic.LoadInt64(&v.i), 10)
+}
+
+func (v *unixEpoch) Set(value int64) {
+	atomic.StoreInt64(&v.i, value)
+}
+
+// unixTime is a wrapper for unixEpoch to format its string as a
+// RFC3339 timestamp that satisfies the expvar.Var interface
+type unixTime struct {
+	*unixEpoch
+}
+
+func (u unixTime) String() string {
+	return time.Unix(0, u.unixEpoch.i).Format(time.RFC3339)
 }

@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestConfigLoadGoldenPath(t *testing.T) {
@@ -21,6 +22,10 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	}
 	if !c.AllowRemoteDebug {
 		t.Errorf("allow_remote_debug: want %t, got %t", true, c.AllowRemoteDebug)
+	}
+	expectedCheck := jsonDuration(3 * time.Minute)
+	if c.ConfigCheckInterval != expectedCheck {
+		t.Errorf("config_check_interval: want %s, got %s", expectedCheck, c.ConfigCheckInterval)
 	}
 	defaultNS := "default"
 	stagingNS := "staging"
@@ -56,6 +61,18 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 		if !reflect.DeepEqual(sec, c.Secrets[i]) {
 			t.Errorf("secret %d: want %#v, got %#v", i, sec, c.Secrets[i])
 		}
+	}
+}
+
+func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
+	cl, err := newConfLoader("./testdata/no_config_check_interval.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cl.Get()
+	expected := jsonDuration(30 * time.Second)
+	if c.ConfigCheckInterval != expected {
+		t.Errorf("default config_check_interval: want %s, got %s", expected, c.ConfigCheckInterval)
 	}
 }
 

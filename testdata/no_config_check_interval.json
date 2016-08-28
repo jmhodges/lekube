@@ -1,0 +1,11 @@
+{
+  "email": "fake@example.com",
+  "use_prod": false,
+  "secrets": [
+    {
+      "namespace": "default",
+      "name": "test",
+      "domains": ["example.com"]
+    }
+  ]
+}

@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -17,7 +16,7 @@ import (
 // newConfLoader does IO immediately to validate the config file at the
 // path. This is not ideal for all purposes, but works here for the following
 // reasons. Since Watch being is called in a background goroutine, it finding an
-// error in the congig file will race with Let's Encrypt account creation. That
+// error in the config file will race with Let's Encrypt account creation. That
 // means that every time it has to crash from the Watch going bad, we could be
 // making a new LE account on the next boot. That's unkind and will get the
 // process rate limited. But we also don't want the process to boot up in a
@@ -26,9 +25,9 @@ import (
 // config file here.
 func newConfLoader(fp string) (*confLoader, error) {
 	cl := &confLoader{
-		path:      fp,
-		lastCheck: &expvar.Int{},
-		lastSet:   &expvar.Int{},
+		path:       fp,
+		lastCheck:  &unixEpoch{},
+		lastChange: &unixEpoch{},
 	}
 	err := cl.load()
 	if err != nil {
@@ -38,10 +37,10 @@ func newConfLoader(fp string) (*confLoader, error) {
 }
 
 type confLoader struct {
-	path      string
-	lastCheck *expvar.Int
-	lastSet   *expvar.Int
-	lastHash  [sha256.Size]byte
+	path       string
+	lastCheck  *unixEpoch
+	lastChange *unixEpoch
+	lastHash   [sha256.Size]byte
 
 	mu   sync.Mutex
 	conf *allConf
@@ -55,10 +54,8 @@ func (cl *confLoader) Get() *allConf {
 
 // Watch blocks
 func (cl *confLoader) Watch() error {
-	tickDur := 5 * time.Minute
-	tick := time.NewTicker(tickDur)
-	for range tick.C {
-		t := time.Now()
+	for {
+		start := time.Now()
 		err := cl.load()
 		if err == errSameHash {
 			continue
@@ -67,8 +64,11 @@ func (cl *confLoader) Watch() error {
 			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 			continue
 		}
-		t = t.Add(tickDur)
-		log.Printf("successfully loaded new config file. next check will be around %s", t)
+		cl.mu.Lock()
+		next := start.Add(time.Duration(cl.conf.ConfigCheckInterval))
+		cl.mu.Unlock()
+		log.Printf("successfully loaded new config file. next check will be around %s", next)
+		time.Sleep(next.Sub(start))
 	}
 	return errors.New("should never return")
 }
@@ -102,16 +102,17 @@ func (cl *confLoader) load() error {
 	// without setting it.
 	cl.lastHash = h
 
-	cl.lastSet.Set(time.Now().UnixNano())
+	cl.lastChange.Set(time.Now().UnixNano())
 	return nil
 }
 
 type allConf struct {
-	Email            string        `json:"email"`
-	UseProd          *bool         `json:"use_prod"`
-	AllowRemoteDebug bool          `json:"allow_remote_debug"`
-	Secrets          []*secretConf `json:"secrets"`
-	TLSDir           string        `json:"tls_dir"`
+	Email               string        `json:"email"`
+	UseProd             *bool         `json:"use_prod"`
+	AllowRemoteDebug    bool          `json:"allow_remote_debug"`
+	Secrets             []*secretConf `json:"secrets"`
+	TLSDir              string        `json:"tls_dir"`
+	ConfigCheckInterval jsonDuration  `json:"config_check_interval"`
 }
 
 type secretConf struct {
@@ -134,6 +135,33 @@ func (n nsSecName) String() string {
 	return fmt.Sprintf("%s:%s", n.ns, n.name)
 }
 
+// ErrDurationMustBeString is returned when a non-string value is
+// presented to be deserialized as a ConfigDuration
+var ErrDurationMustBeString = errors.New("cannot JSON unmarshal something other than a string into a ConfigDuration")
+
+type jsonDuration time.Duration
+
+// UnmarshalJSON parses a string into a ConfigDuration using
+// time.ParseDuration.  If the input does not unmarshal as a
+// string, then UnmarshalJSON returns ErrDurationMustBeString.
+func (d *jsonDuration) UnmarshalJSON(b []byte) error {
+	s := ""
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		if _, ok := err.(*json.UnmarshalTypeError); ok {
+			return ErrDurationMustBeString
+		}
+		return err
+	}
+	dd, err := time.ParseDuration(s)
+	*d = jsonDuration(dd)
+	return err
+}
+
+func (d jsonDuration) String() string {
+	return time.Duration(d).String()
+}
+
 func dirURLFromConf(conf *allConf) string {
 	if *conf.UseProd {
 		return "https://acme-v01.api.letsencrypt.org/directory"
@@ -149,6 +177,12 @@ func unmarshalConf(fp string) (*allConf, error) {
 	defer f.Close()
 	conf := &allConf{}
 	err = json.NewDecoder(f).Decode(conf)
+	if err != nil {
+		return nil, err
+	}
+	if conf.ConfigCheckInterval == jsonDuration(0) {
+		conf.ConfigCheckInterval = jsonDuration(30 * time.Second)
+	}
 	return conf, err
 }
 
