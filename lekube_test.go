@@ -8,11 +8,14 @@ import (
 )
 
 func TestConfigLoadGoldenPath(t *testing.T) {
-	cl, err := newConfLoader("./testdata/test.json")
+	cl, c, err := newConfLoader("./testdata/test.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := cl.Get()
+	c2 := cl.Get()
+	if c != c2 {
+		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
+	}
 	email := "fake@example.com"
 	if c.Email != email {
 		t.Errorf("email: want %#v, got %#v", email, c.Email)
@@ -65,11 +68,14 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 }
 
 func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
-	cl, err := newConfLoader("./testdata/no_config_check_interval.json")
+	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := cl.Get()
+	c2 := cl.Get()
+	if c != c2 {
+		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
+	}
 	expected := jsonDuration(30 * time.Second)
 	if c.ConfigCheckInterval != expected {
 		t.Errorf("default config_check_interval: want %s, got %s", expected, c.ConfigCheckInterval)
