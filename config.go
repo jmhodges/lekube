@@ -6,24 +6,24 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
 
-// newConfLoader does IO immediately to validate the config file at the
-// path. This is not ideal for all purposes, but works here for the following
-// reasons. Since Watch being is called in a background goroutine, it finding an
-// error in the config file will race with Let's Encrypt account creation. That
-// means that every time it has to crash from the Watch going bad, we could be
-// making a new LE account on the next boot. That's unkind and will get the
-// process rate limited. But we also don't want the process to boot up in a
-// state that is obviously invalid since people running this the first time
-// might not know they screwed the config file up. So, take the L and load the
-// config file here.
-func newConfLoader(fp string) (*confLoader, error) {
+// newConfLoader does I/O immediately to validate the config file at the given
+// path and return its *allConf representation. Doing I/O in a constructor is
+// not ideal for all purposes, but works here for the following reasons. Since
+// Watch only returns if the config file changes without error, finding an error
+// in the config file using it alone is impossible. That means that lekube can
+// boot with a busted config file and the user wouldn't know unless they were
+// tracking the stats. But changing Watch to always return the error would mean
+// the lekube process could cratch whenever the user writes a busted config into
+// that file path and that would cause a reboot and another account
+// acquisition. That's a bummer. So, take the L and load the config file here
+// and let Watch eat and record the errors.
+func newConfLoader(fp string) (*confLoader, *allConf, error) {
 	cl := &confLoader{
 		path:       fp,
 		lastCheck:  &unixEpoch{},
@@ -31,56 +31,78 @@ func newConfLoader(fp string) (*confLoader, error) {
 	}
 	err := cl.load()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return cl, nil
+	return cl, cl.Get(), nil
 }
 
 type confLoader struct {
-	path       string
-	lastCheck  *unixEpoch
+	path      string
+	lastCheck *unixEpoch
+
+	// loadMu locks calls to confLoader.load, but doesn't prevent concurrent
+	// reads of confLoader.conf. This allows us to prevent multiple reads of the
+	// config file on disk without blocking calls to confloader.Get on file I/O.
+	loadMu sync.Mutex
+
+	// confMu locks the writes and reads of lastChange, lastHash, and, most
+	// imporantly, the conf. Locking lastHash (while locking all of load
+	// separately) prevents concurrent Watches from reading different versions
+	// of the file and one with and older version setting the conf at a later
+	// time than the others.
+	confMu     sync.Mutex
 	lastChange *unixEpoch
 	lastHash   [sha256.Size]byte
-
-	mu   sync.Mutex
-	conf *allConf
+	conf       *allConf
 }
 
 func (cl *confLoader) Get() *allConf {
-	cl.mu.Lock()
-	defer cl.mu.Unlock()
+	cl.confMu.Lock()
+	defer cl.confMu.Unlock()
 	return cl.conf
 }
 
-// Watch blocks
-func (cl *confLoader) Watch() error {
+// Watch blocks until a change in the config is seen and succesfully validates. If
+// the config cannot be read or it does not parse or validate, it is not
+// returned and Watch continues to block.
+func (cl *confLoader) Watch() *allConf {
 	for {
 		start := time.Now()
 		err := cl.load()
-		if err == errSameHash {
-			continue
+		c := cl.Get()
+		if err == nil {
+			return c
 		}
-		if err != nil {
+
+		waitDur := 30 * time.Second
+		// c is always non-nil here since we require the first load of the
+		// config to occur at construction time in newConfLoader. We might
+		// have a c from a previous load, but it'll be useful.
+		waitDur = time.Duration(c.ConfigCheckInterval)
+		next := start.Add(waitDur)
+
+		if err != errSameHash {
 			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
-			continue
 		}
-		cl.mu.Lock()
-		next := start.Add(time.Duration(cl.conf.ConfigCheckInterval))
-		cl.mu.Unlock()
-		log.Printf("successfully loaded new config file. next check will be around %s", next)
 		time.Sleep(next.Sub(start))
 	}
-	return errors.New("should never return")
 }
 
 var errSameHash = errors.New("same hash as last read config file")
 
 func (cl *confLoader) load() error {
+	cl.loadMu.Lock()
+	defer cl.loadMu.Unlock()
+
 	cl.lastCheck.Set(time.Now().UnixNano())
 	b, err := ioutil.ReadFile(cl.path)
 	if err != nil {
 		return err
 	}
+
+	cl.confMu.Lock()
+	defer cl.confMu.Unlock()
+
 	h := sha256.Sum256(b)
 	if h == cl.lastHash {
 		return errSameHash
@@ -93,15 +115,9 @@ func (cl *confLoader) load() error {
 	if err := validateConf(conf); err != nil {
 		return err
 	}
-	cl.mu.Lock()
-	defer cl.mu.Unlock()
+
 	cl.conf = conf
-
-	// lastHash is only used in this goroutine, and so doesn't need to be under
-	// the lock. It's only here for clarity and to prevent setting the conf
-	// without setting it.
 	cl.lastHash = h
-
 	cl.lastChange.Set(time.Now().UnixNano())
 	return nil
 }

@@ -29,12 +29,11 @@ import (
 )
 
 var (
-	confPath         = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
-	startRenewDur    = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
-	betweenChecksDur = flag.Duration("betweenChecksDur", 8*time.Hour, "duration to wait before checking to see if any of the TLS secrets have expired")
-	httpAddr         = flag.String("addr", ":10080", "address to boot the HTTP server on")
-	httpsAddr        = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
-	leTimeout        = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
+	confPath      = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
+	startRenewDur = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
+	httpAddr      = flag.String("addr", ":10080", "address to boot the HTTP server on")
+	httpsAddr     = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
+	leTimeout     = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
 	fetchSecretErrors  = &expvar.Int{}
 	fetchLECertErrors  = &expvar.Int{}
@@ -69,7 +68,7 @@ func main() {
 	stageMetrics.Set("errors", errorCount)
 	expvar.Publish("stages", stageMetrics)
 
-	cLoader, err := newConfLoader(*confPath)
+	cLoader, conf, err := newConfLoader(*confPath)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
@@ -77,8 +76,6 @@ func main() {
 	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
 	loadConfigMetrics.Set("last_config_change", cLoader.lastChange)
 	loadConfigMetrics.Set("last_config_change_str", unixTime{unixEpoch: cLoader.lastChange})
-
-	conf := cLoader.Get()
 
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -125,17 +122,10 @@ func main() {
 	m.Handle("/", responder)
 
 	go func() {
-		tick := time.NewTicker(*betweenChecksDur)
-		run(lcm, kubeClient, cLoader, *leTimeout)
-		for range tick.C {
-			run(lcm, kubeClient, cLoader, *leTimeout)
-		}
-	}()
-
-	go func() {
-		err := cLoader.Watch()
-		if err != nil {
-			log.Fatalf("lost the watch on the config file: %s", err)
+		run(lcm, kubeClient, conf, *leTimeout)
+		for {
+			conf := cLoader.Watch()
+			run(lcm, kubeClient, conf, *leTimeout)
 		}
 	}()
 
@@ -156,13 +146,12 @@ func main() {
 	}
 }
 
-func run(lcm *leClientMaker, client core13.CoreInterface, cLoader *confLoader, leTimeout time.Duration) {
+func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
 	runCount.Add(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	alreadyAuthDomains := make(map[string]bool)
-	conf := cLoader.Get()
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
