@@ -3,6 +3,7 @@
   "use_prod": true,
   "allow_remote_debug": true,
   "tls_dir": "./testdata/tls",
+  "config_check_interval": "3m",
   "secrets": [
     {
       "namespace": "default",

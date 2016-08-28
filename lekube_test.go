@@ -4,14 +4,18 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestConfigLoadGoldenPath(t *testing.T) {
-	cl, err := newConfLoader("./testdata/test.json")
+	cl, c, err := newConfLoader("./testdata/test.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := cl.Get()
+	c2 := cl.Get()
+	if c != c2 {
+		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
+	}
 	email := "fake@example.com"
 	if c.Email != email {
 		t.Errorf("email: want %#v, got %#v", email, c.Email)
@@ -21,6 +25,10 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	}
 	if !c.AllowRemoteDebug {
 		t.Errorf("allow_remote_debug: want %t, got %t", true, c.AllowRemoteDebug)
+	}
+	expectedCheck := jsonDuration(3 * time.Minute)
+	if c.ConfigCheckInterval != expectedCheck {
+		t.Errorf("config_check_interval: want %s, got %s", expectedCheck, c.ConfigCheckInterval)
 	}
 	defaultNS := "default"
 	stagingNS := "staging"
@@ -56,6 +64,21 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 		if !reflect.DeepEqual(sec, c.Secrets[i]) {
 			t.Errorf("secret %d: want %#v, got %#v", i, sec, c.Secrets[i])
 		}
+	}
+}
+
+func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
+	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2 := cl.Get()
+	if c != c2 {
+		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
+	}
+	expected := jsonDuration(30 * time.Second)
+	if c.ConfigCheckInterval != expected {
+		t.Errorf("default config_check_interval: want %s, got %s", expected, c.ConfigCheckInterval)
 	}
 }
 
