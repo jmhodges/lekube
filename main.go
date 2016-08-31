@@ -287,9 +287,9 @@ func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kube
 			},
 			Data: make(map[string][]byte),
 		}
-		storeSecretUpdates.Add(1)
-	} else {
 		storeSecretCreates.Add(1)
+	} else {
+		storeSecretUpdates.Add(1)
 	}
 
 	sec.Data["tls.crt"] = leCert.Cert
