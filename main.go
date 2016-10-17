@@ -47,6 +47,8 @@ var (
 	fetchLECertSuccesses = &expvar.Int{}
 	storeSecretSuccesses = &expvar.Int{}
 	loadConfigSuccesses  = &expvar.Int{}
+	storeSecretCreates   = &expvar.Int{}
+	storeSecretUpdates   = &expvar.Int{}
 	runCount             = &expvar.Int{}
 	errorCount           = &expvar.Int{}
 	fetchSecretMetrics   = (&expvar.Map{}).Init()
@@ -84,6 +86,9 @@ func main() {
 	fetchLECertMetrics.Set("successes", fetchLECertSuccesses)
 	storeSecretMetrics.Set("successes", storeSecretSuccesses)
 	loadConfigMetrics.Set("successes", cLoader.successes)
+
+	storeSecretMetrics.Set("secret_updates", storeSecretUpdates)
+	storeSecretMetrics.Set("secret_creates", storeSecretCreates)
 
 	stageMetrics.Set("fetch_secret", fetchSecretMetrics)
 	stageMetrics.Set("fetch_le_cert", fetchLECertMetrics)
@@ -300,6 +305,9 @@ func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kube
 			},
 			Data: make(map[string][]byte),
 		}
+		storeSecretCreates.Add(1)
+	} else {
+		storeSecretUpdates.Add(1)
 	}
 
 	sec.Data["tls.crt"] = leCert.Cert
