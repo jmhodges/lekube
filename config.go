@@ -115,7 +115,6 @@ func (cl *confLoader) Watch() *allConf {
 			prevErr = err
 			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 		}
-		log.Printf("sleeping until %s", next)
 		time.Sleep(next.Sub(start))
 	}
 }
