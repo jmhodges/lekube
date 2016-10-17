@@ -147,10 +147,28 @@ func main() {
 
 	m.Handle("/", responder)
 
+	watchCh := make(chan *allConf)
+	runCh := make(chan *allConf)
+
 	go func() {
-		run(lcm, kubeClient, conf, *leTimeoutDur)
 		for {
-			conf := cLoader.Watch()
+			watchCh <- cLoader.Watch()
+		}
+	}()
+	go func() {
+		conf := conf
+		runCh <- conf
+		t := time.NewTicker(1 * time.Hour)
+		for {
+			select {
+			case <-t.C:
+			case conf = <-watchCh:
+			}
+			runCh <- conf
+		}
+	}()
+	go func() {
+		for conf := range runCh {
 			run(lcm, kubeClient, conf, *leTimeoutDur)
 		}
 	}()
