@@ -213,6 +213,11 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 	for _, secConf := range okaySecs {
 		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
+		if tlsSec == nil {
+			log.Printf("no such secret %s", secConf.FullName())
+		} else if tlsSec.Cert == nil {
+			log.Printf("no tls.crt in secret %s", secConf.FullName())
+		}
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
