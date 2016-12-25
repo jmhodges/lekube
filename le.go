@@ -374,13 +374,14 @@ func (lac *limitedACMEClient) Register(ctx context.Context, a *acme.Account, pro
 func newLELimiters() leLimiters {
 	// The Let's Encrypt request-per-IP-per-endpoint-per-second rate limit is
 	// 10.
+	rl := rate.NewLimiter(rate.Limit(10), 10)
 	return leLimiters{
-		disc:       rate.NewLimiter(rate.Limit(10), 10),
-		createCert: rate.NewLimiter(rate.Limit(10), 10),
-		newAuth:    rate.NewLimiter(rate.Limit(10), 10),
-		accept:     rate.NewLimiter(rate.Limit(10), 10),
-		getAuth:    rate.NewLimiter(rate.Limit(10), 10),
-		reg:        rate.NewLimiter(rate.Limit(10), 10),
+		disc:       rl,
+		createCert: rl,
+		newAuth:    rl,
+		accept:     rl,
+		getAuth:    rl,
+		reg:        rl,
 	}
 }
 
