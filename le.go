@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/cenk/backoff"
 	"golang.org/x/crypto/acme"
+	"golang.org/x/net/context"
 	"golang.org/x/time/rate"
 )
 
