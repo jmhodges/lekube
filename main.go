@@ -349,6 +349,7 @@ func recordError(st stage, format string, args ...interface{}) {
 
 func closeToExpiration(cert *x509.Certificate, startRenewDur time.Duration) bool {
 	t := time.Now().Add(startRenewDur)
+	log.Printf("closeToExpiration, NotAfter: %s; StartRenewAt: %s", t)
 	return t.Equal(cert.NotAfter) || t.After(cert.NotAfter)
 }
 
