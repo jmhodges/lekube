@@ -30,6 +30,10 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	if c.ConfigCheckInterval != expectedCheck {
 		t.Errorf("config_check_interval: want %s, got %s", expectedCheck, c.ConfigCheckInterval)
 	}
+	expectedRenewDur := jsonDuration(3 * time.Hour)
+	if c.StartRenewDur != expectedRenewDur {
+		t.Errorf("start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
+	}
 	defaultNS := "default"
 	stagingNS := "staging"
 	emptyNS := ""
@@ -79,6 +83,10 @@ func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 	expected := jsonDuration(30 * time.Second)
 	if c.ConfigCheckInterval != expected {
 		t.Errorf("default config_check_interval: want %s, got %s", expected, c.ConfigCheckInterval)
+	}
+	expectedRenewDur := jsonDuration(504 * time.Hour)
+	if c.StartRenewDur != expectedRenewDur {
+		t.Errorf("default start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
 	}
 }
 
