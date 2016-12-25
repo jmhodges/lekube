@@ -818,7 +818,7 @@ func fetchNonce(ctx context.Context, client *http.Client, url string) (string, e
 	if err != nil {
 		return "", err
 	}
-	log.Printf("fetchNonce 20 %d %#v %s", resp.StatusCode, resp.Header.Get("replay-nonce"), string(argh), url) // FIXME
+	log.Printf("fetchNonce 20 %d %#v %s %s", resp.StatusCode, resp.Header.Get("replay-nonce"), string(argh), url) // FIXME
 	defer resp.Body.Close()
 	enc := resp.Header.Get("replay-nonce")
 	if enc == "" {
