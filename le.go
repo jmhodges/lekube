@@ -368,7 +368,7 @@ func (lac *limitedACMEClient) Register(ctx context.Context, a *acme.Account, pro
 	if err := lac.limits.reg.Wait(ctx); err != nil {
 		return nil, err
 	}
-	return lac.cl.Register(ctx, a)
+	return lac.cl.Register(ctx, a, prompt)
 }
 
 func newLELimiters() leLimiters {
