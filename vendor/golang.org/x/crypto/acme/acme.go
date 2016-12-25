@@ -193,7 +193,7 @@ func (c *Client) CreateCert(ctx context.Context, csr []byte, exp time.Duration, 
 		req.NotAfter = now.Add(exp).Format(time.RFC3339)
 	}
 
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.CertURL, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.CertURL, req, c.DirectoryURL)
 	if err != nil {
 		return nil, "", err
 	}
@@ -268,7 +268,7 @@ func (c *Client) RevokeCert(ctx context.Context, key crypto.Signer, cert []byte,
 	if key == nil {
 		key = c.Key
 	}
-	res, err := postJWS(ctx, c.HTTPClient, key, c.dir.RevokeURL, body)
+	res, err := postJWS(ctx, c.HTTPClient, key, c.dir.RevokeURL, body, c.DirectoryURL)
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func (c *Client) Authorize(ctx context.Context, domain string) (*Authorization, 
 		Resource:   "new-authz",
 		Identifier: authzID{Type: "dns", Value: domain},
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.AuthzURL, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.AuthzURL, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (c *Client) RevokeAuthorization(ctx context.Context, url string) error {
 		Status:   "deactivated",
 		Delete:   true,
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req, c.DirectoryURL)
 	if err != nil {
 		return err
 	}
@@ -520,7 +520,7 @@ func (c *Client) Accept(ctx context.Context, chal *Challenge) (*Challenge, error
 		Type:     chal.Type,
 		Auth:     auth,
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, chal.URI, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, chal.URI, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -653,7 +653,7 @@ func (c *Client) doReg(ctx context.Context, url string, typ string, acct *Accoun
 		req.Contact = acct.Contact
 		req.Agreement = acct.AgreedTerms
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -796,8 +796,8 @@ func chainCert(ctx context.Context, client *http.Client, url string, depth int) 
 
 // postJWS signs the body with the given key and POSTs it to the provided url.
 // The body argument must be JSON-serializable.
-func postJWS(ctx context.Context, client *http.Client, key crypto.Signer, url string, body interface{}) (*http.Response, error) {
-	nonce, err := fetchNonce(ctx, client, url)
+func postJWS(ctx context.Context, client *http.Client, key crypto.Signer, url string, body interface{}, dirURL string) (*http.Response, error) {
+	nonce, err := fetchNonce(ctx, client, dirURL)
 	if err != nil {
 		return nil, err
 	}
