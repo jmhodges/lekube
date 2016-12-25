@@ -44,10 +44,8 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FIXME add verbose
-	log.Printf("responder received %s", r.URL.Path)
-
 	if !strings.HasPrefix(r.URL.Path, acmePath) {
+		log.Printf("responder received incorrectly prefixed path %s", r.URL.Path)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
@@ -57,9 +55,11 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, ok := lr.bodies[token]
 	lr.Unlock()
 	if !ok {
+		log.Printf("responder received missing token path %s", r.URL.Path)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
+	log.Printf("responder received known path %s", r.URL.Path)
 	w.Write(body)
 }
 

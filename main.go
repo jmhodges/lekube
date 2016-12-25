@@ -211,7 +211,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 
 	alreadyAuthDomains := make(map[string]bool)
 	for _, secConf := range okaySecs {
-		log.Printf("doing work on %s", secConf.FullName())
+		log.Printf("checking on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
 		if tlsSec == nil {
 			log.Printf("no such secret %s", secConf.FullName())
@@ -219,6 +219,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 			log.Printf("no tls.crt in secret %s", secConf.FullName())
 		}
 		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) || domainMismatch(tlsSec.Cert, secConf.Domains) {
+			log.Printf("working on %s", secConf.FullName())
 			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
