@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -808,10 +809,12 @@ func postJWS(ctx context.Context, client *http.Client, key crypto.Signer, url st
 }
 
 func fetchNonce(ctx context.Context, client *http.Client, url string) (string, error) {
+	log.Println("fetchNonce 1", url) // FIXME
 	resp, err := ctxhttp.Head(ctx, client, url)
 	if err != nil {
 		return "", nil
 	}
+	log.Println("fetchNonce 20", url, resp.StatusCode) // FIXME
 	defer resp.Body.Close()
 	enc := resp.Header.Get("replay-nonce")
 	if enc == "" {
