@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/cenk/backoff"
 	"golang.org/x/crypto/acme"
-	"golang.org/x/net/context"
 	"golang.org/x/time/rate"
 )
 
@@ -368,7 +368,7 @@ func (lac *limitedACMEClient) Register(ctx context.Context, a *acme.Account, pro
 	if err := lac.limits.reg.Wait(ctx); err != nil {
 		return nil, err
 	}
-	return lac.cl.UpdateReg(ctx, a)
+	return lac.cl.Register(ctx, a)
 }
 
 func newLELimiters() leLimiters {
