@@ -71,7 +71,7 @@
 			"importpath": "github.com/google/acme",
 			"repository": "https://github.com/google/acme",
 			"vcs": "git",
-			"revision": "400805812f216beb48a7f1b5bfdeee9acd85cee1",
+			"revision": "405b837ccffc76ba14775a158136b4fc86083040",
 			"branch": "master",
 			"notests": true
 		},
@@ -161,6 +161,15 @@
 			"revision": "d77da356e56a7428ad25149ca77381849a6a5232",
 			"branch": "master",
 			"path": "vendor/github.com/pmezard/go-difflib/difflib",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/crypto/acme",
+			"repository": "https://go.googlesource.com/crypto",
+			"vcs": "git",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"branch": "master",
+			"path": "/acme",
 			"notests": true
 		},
 		{

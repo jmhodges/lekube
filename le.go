@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/cenk/backoff"
-	"github.com/google/acme"
+	"golang.org/x/crypto/acme"
 )
 
 type leClient struct {
