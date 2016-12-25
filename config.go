@@ -160,6 +160,7 @@ type allConf struct {
 	Secrets             []*secretConf `json:"secrets"`
 	TLSDir              string        `json:"tls_dir"`
 	ConfigCheckInterval jsonDuration  `json:"config_check_interval"`
+	StartRenewDur       jsonDuration  `json:"start_renew_duration"`
 }
 
 type secretConf struct {
@@ -229,6 +230,9 @@ func unmarshalConf(fp string) (*allConf, error) {
 	}
 	if conf.ConfigCheckInterval == jsonDuration(0) {
 		conf.ConfigCheckInterval = jsonDuration(30 * time.Second)
+	}
+	if conf.StartRenewDur == jsonDuration(0) {
+		conf.StartRenewDur = jsonDuration(3 * 7 * 24 * time.Hour)
 	}
 	return conf, err
 }

@@ -29,11 +29,10 @@ import (
 )
 
 var (
-	confPath      = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
-	startRenewDur = flag.Duration("startRenewDur", 3*7*24*time.Hour, "duration before cert expiration to start attempting to renew it")
-	httpAddr      = flag.String("addr", ":10080", "address to boot the HTTP server on")
-	httpsAddr     = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
-	leTimeoutDur  = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
+	confPath     = flag.String("conf", "", "path to required JSON config file described by https://github.com/jmhodges/lekube/#config-format")
+	httpAddr     = flag.String("addr", ":10080", "address to boot the HTTP server on")
+	httpsAddr    = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
+	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
 	fetchSecretAttempts  = &expvar.Int{}
 	fetchLECertAttempts  = &expvar.Int{}
@@ -214,7 +213,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 	for _, secConf := range okaySecs {
 		log.Printf("doing work on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
-		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert) || domainMismatch(tlsSec.Cert, secConf.Domains) {
+		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) || domainMismatch(tlsSec.Cert, secConf.Domains) {
 			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
@@ -348,8 +347,8 @@ func recordError(st stage, format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-func closeToExpiration(cert *x509.Certificate) bool {
-	t := time.Now().Add(*startRenewDur)
+func closeToExpiration(cert *x509.Certificate, startRenewDur time.Duration) bool {
+	t := time.Now().Add(startRenewDur)
 	return t.Equal(cert.NotAfter) || t.After(cert.NotAfter)
 }
 

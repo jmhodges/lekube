@@ -4,6 +4,7 @@
   "allow_remote_debug": true,
   "tls_dir": "./testdata/tls",
   "config_check_interval": "3m",
+  "start_renew_duration": "3h",
   "secrets": [
     {
       "namespace": "default",
