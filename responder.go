@@ -16,7 +16,12 @@ type leResponder struct {
 	accountKeyThumbprint string // raw base64url encoded thumbprint
 
 	sync.Mutex
-	bodies map[string][]byte
+	bodies map[string]responseInfo
+}
+
+type responseInfo struct {
+	body   []byte
+	domain string
 }
 
 func newLEResponser(accountPubKey *rsa.PublicKey) (*leResponder, error) {
@@ -28,7 +33,7 @@ func newLEResponser(accountPubKey *rsa.PublicKey) (*leResponder, error) {
 	thumbprintB64 := base64.RawURLEncoding.EncodeToString(thumbprint)
 	lr := &leResponder{
 		accountKeyThumbprint: thumbprintB64,
-		bodies:               make(map[string][]byte),
+		bodies:               make(map[string]responseInfo),
 	}
 	return lr, nil
 }
@@ -44,34 +49,34 @@ func (lr *leResponder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// FIXME add verbose
-	log.Printf("responder received %s", r.URL.Path)
-
 	if !strings.HasPrefix(r.URL.Path, acmePath) {
+		log.Printf("responder received incorrectly prefixed path %s", r.URL.Path)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
 	token := r.URL.Path[len(acmePath):len(r.URL.Path)]
 	ok := false
 	lr.Lock()
-	body, ok := lr.bodies[token]
+	info, ok := lr.bodies[token]
 	lr.Unlock()
 	if !ok {
+		log.Printf("responder received unknown token path %s", r.URL.Path)
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
-	w.Write(body)
+	log.Printf("responder received known path (for domain %s) %s", info.domain, r.URL.Path)
+	w.Write(info.body)
 }
 
-func (lr *leResponder) AddAuthorization(token string) {
+func (lr *leResponder) AddAuthorization(domain, token string) {
 	ka := token + "." + lr.accountKeyThumbprint
 	lr.Lock()
 	defer lr.Unlock()
-	lr.bodies[token] = []byte(ka)
+	lr.bodies[token] = responseInfo{body: []byte(ka), domain: domain}
 }
 
 func (lr *leResponder) Reset() {
 	lr.Lock()
 	defer lr.Unlock()
-	lr.bodies = make(map[string][]byte)
+	lr.bodies = make(map[string]responseInfo)
 }
