@@ -211,16 +211,32 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 
 	alreadyAuthDomains := make(map[string]bool)
 	for _, secConf := range okaySecs {
-		log.Printf("doing work on %s", secConf.FullName())
+		log.Printf("checking on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
-		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) || domainMismatch(tlsSec.Cert, secConf.Domains) {
+		refreshCert := false
+		if tlsSec == nil {
+			log.Printf("no such secret %s", secConf.FullName())
+			refreshCert = true
+		} else if tlsSec.Cert == nil {
+			log.Printf("no tls.crt in secret %s", secConf.FullName())
+			refreshCert = true
+		} else if closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) {
+			log.Printf("cert close to expiration in secret %s, NotAfter: %s; Now: %s StartRenewDur: %s", secConf.FullName(), tlsSec.Cert.NotAfter, time.Now(), time.Duration(conf.StartRenewDur))
+			refreshCert = true
+		} else if domainMismatch(tlsSec.Cert, secConf.Domains) {
+			log.Printf("domain mismatch between cert and secret %s", secConf.FullName())
+			refreshCert = true
+		}
+
+		if refreshCert {
+			log.Printf("working on %s", secConf.FullName())
 			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
 		}
-
 	}
 }
+
 func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
