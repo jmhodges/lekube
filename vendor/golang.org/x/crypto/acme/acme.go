@@ -6,6 +6,10 @@
 // Automatic Certificate Management Environment (ACME) spec.
 // See https://tools.ietf.org/html/draft-ietf-acme-acme-02 for details.
 //
+// Most common scenarios will want to use autocert subdirectory instead,
+// which provides automatic access to certificates from Let's Encrypt
+// and any other ACME-based CA.
+//
 // This package is a work in progress and makes no API stability promises.
 package acme
 
@@ -44,6 +48,38 @@ const (
 	maxChainLen = 5       // max depth and breadth of a certificate chain
 	maxCertSize = 1 << 20 // max size of a certificate, in bytes
 )
+
+// CertOption is an optional argument type for Client methods which manipulate
+// certificate data.
+type CertOption interface {
+	privateCertOpt()
+}
+
+// WithKey creates an option holding a private/public key pair.
+// The private part signs a certificate, and the public part represents the signee.
+func WithKey(key crypto.Signer) CertOption {
+	return &certOptKey{key}
+}
+
+type certOptKey struct {
+	key crypto.Signer
+}
+
+func (*certOptKey) privateCertOpt() {}
+
+// WithTemplate creates an option for specifying a certificate template.
+// See x509.CreateCertificate for template usage details.
+//
+// In TLSSNIxChallengeCert methods, the template is also used as parent,
+// resulting in a self-signed certificate.
+// The DNSNames field of t is always overwritten for tls-sni challenge certs.
+func WithTemplate(t *x509.Certificate) CertOption {
+	return (*certOptTemplate)(t)
+}
+
+type certOptTemplate x509.Certificate
+
+func (*certOptTemplate) privateCertOpt() {}
 
 // Client is an ACME client.
 // The only required field is Key. An example of creating a client with a new key
@@ -156,7 +192,7 @@ func (c *Client) CreateCert(ctx context.Context, csr []byte, exp time.Duration, 
 		req.NotAfter = now.Add(exp).Format(time.RFC3339)
 	}
 
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.CertURL, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.CertURL, req, c.DirectoryURL)
 	if err != nil {
 		return nil, "", err
 	}
@@ -231,7 +267,7 @@ func (c *Client) RevokeCert(ctx context.Context, key crypto.Signer, cert []byte,
 	if key == nil {
 		key = c.Key
 	}
-	res, err := postJWS(ctx, c.HTTPClient, key, c.dir.RevokeURL, body)
+	res, err := postJWS(ctx, c.HTTPClient, key, c.dir.RevokeURL, body, c.DirectoryURL)
 	if err != nil {
 		return err
 	}
@@ -319,7 +355,7 @@ func (c *Client) Authorize(ctx context.Context, domain string) (*Authorization, 
 		Resource:   "new-authz",
 		Identifier: authzID{Type: "dns", Value: domain},
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.AuthzURL, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, c.dir.AuthzURL, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +392,36 @@ func (c *Client) GetAuthorization(ctx context.Context, url string) (*Authorizati
 		return nil, fmt.Errorf("acme: invalid response: %v", err)
 	}
 	return v.authorization(url), nil
+}
+
+// RevokeAuthorization relinquishes an existing authorization identified
+// by the given URL.
+// The url argument is an Authorization.URI value.
+//
+// If successful, the caller will be required to obtain a new authorization
+// using the Authorize method before being able to request a new certificate
+// for the domain associated with the authorization.
+//
+// It does not revoke existing certificates.
+func (c *Client) RevokeAuthorization(ctx context.Context, url string) error {
+	req := struct {
+		Resource string `json:"resource"`
+		Status   string `json:"status"`
+		Delete   bool   `json:"delete"`
+	}{
+		Resource: "authz",
+		Status:   "deactivated",
+		Delete:   true,
+	}
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req, c.DirectoryURL)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return responseError(res)
+	}
+	return nil
 }
 
 // WaitAuthorization polls an authorization at the given URL
@@ -453,7 +519,7 @@ func (c *Client) Accept(ctx context.Context, chal *Challenge) (*Challenge, error
 		Type:     chal.Type,
 		Auth:     auth,
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, chal.URI, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, chal.URI, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +535,20 @@ func (c *Client) Accept(ctx context.Context, chal *Challenge) (*Challenge, error
 		return nil, fmt.Errorf("acme: invalid response: %v", err)
 	}
 	return v.challenge(), nil
+}
+
+// DNS01ChallengeRecord returns a DNS record value for a dns-01 challenge response.
+// A TXT record containing the returned value must be provisioned under
+// "_acme-challenge" name of the domain being validated.
+//
+// The token argument is a Challenge.Token value.
+func (c *Client) DNS01ChallengeRecord(token string) (string, error) {
+	ka, err := keyAuth(c.Key.Public(), token)
+	if err != nil {
+		return "", err
+	}
+	b := sha256.Sum256([]byte(ka))
+	return base64.RawURLEncoding.EncodeToString(b[:]), nil
 }
 
 // HTTP01ChallengeResponse returns the response for an http-01 challenge.
@@ -500,10 +580,13 @@ func (c *Client) HTTP01ChallengePath(token string) string {
 // For more details on TLS-SNI-01 see https://tools.ietf.org/html/draft-ietf-acme-acme-01#section-7.3.
 //
 // The token argument is a Challenge.Token value.
+// If a WithKey option is provided, its private part signs the returned cert,
+// and the public part is used to specify the signee.
+// If no WithKey option is provided, a new ECDSA key is generated using P-256 curve.
 //
 // The returned certificate is valid for the next 24 hours and must be presented only when
 // the server name of the client hello matches exactly the returned name value.
-func (c *Client) TLSSNI01ChallengeCert(token string) (cert tls.Certificate, name string, err error) {
+func (c *Client) TLSSNI01ChallengeCert(token string, opt ...CertOption) (cert tls.Certificate, name string, err error) {
 	ka, err := keyAuth(c.Key.Public(), token)
 	if err != nil {
 		return tls.Certificate{}, "", err
@@ -511,7 +594,7 @@ func (c *Client) TLSSNI01ChallengeCert(token string) (cert tls.Certificate, name
 	b := sha256.Sum256([]byte(ka))
 	h := hex.EncodeToString(b[:])
 	name = fmt.Sprintf("%s.%s.acme.invalid", h[:32], h[32:])
-	cert, err = tlsChallengeCert(name)
+	cert, err = tlsChallengeCert([]string{name}, opt)
 	if err != nil {
 		return tls.Certificate{}, "", err
 	}
@@ -524,10 +607,13 @@ func (c *Client) TLSSNI01ChallengeCert(token string) (cert tls.Certificate, name
 // https://tools.ietf.org/html/draft-ietf-acme-acme-03#section-7.3.
 //
 // The token argument is a Challenge.Token value.
+// If a WithKey option is provided, its private part signs the returned cert,
+// and the public part is used to specify the signee.
+// If no WithKey option is provided, a new ECDSA key is generated using P-256 curve.
 //
 // The returned certificate is valid for the next 24 hours and must be presented only when
 // the server name in the client hello matches exactly the returned name value.
-func (c *Client) TLSSNI02ChallengeCert(token string) (cert tls.Certificate, name string, err error) {
+func (c *Client) TLSSNI02ChallengeCert(token string, opt ...CertOption) (cert tls.Certificate, name string, err error) {
 	b := sha256.Sum256([]byte(token))
 	h := hex.EncodeToString(b[:])
 	sanA := fmt.Sprintf("%s.%s.token.acme.invalid", h[:32], h[32:])
@@ -540,7 +626,7 @@ func (c *Client) TLSSNI02ChallengeCert(token string) (cert tls.Certificate, name
 	h = hex.EncodeToString(b[:])
 	sanB := fmt.Sprintf("%s.%s.ka.acme.invalid", h[:32], h[32:])
 
-	cert, err = tlsChallengeCert(sanA, sanB)
+	cert, err = tlsChallengeCert([]string{sanA, sanB}, opt)
 	if err != nil {
 		return tls.Certificate{}, "", err
 	}
@@ -566,7 +652,7 @@ func (c *Client) doReg(ctx context.Context, url string, typ string, acct *Accoun
 		req.Contact = acct.Contact
 		req.Agreement = acct.AgreedTerms
 	}
-	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req)
+	res, err := postJWS(ctx, c.HTTPClient, c.Key, url, req, c.DirectoryURL)
 	if err != nil {
 		return nil, err
 	}
@@ -709,8 +795,8 @@ func chainCert(ctx context.Context, client *http.Client, url string, depth int) 
 
 // postJWS signs the body with the given key and POSTs it to the provided url.
 // The body argument must be JSON-serializable.
-func postJWS(ctx context.Context, client *http.Client, key crypto.Signer, url string, body interface{}) (*http.Response, error) {
-	nonce, err := fetchNonce(ctx, client, url)
+func postJWS(ctx context.Context, client *http.Client, key crypto.Signer, url string, body interface{}, dirURL string) (*http.Response, error) {
+	nonce, err := fetchNonce(ctx, client, dirURL)
 	if err != nil {
 		return nil, err
 	}
@@ -801,21 +887,49 @@ func keyAuth(pub crypto.PublicKey, token string) (string, error) {
 }
 
 // tlsChallengeCert creates a temporary certificate for TLS-SNI challenges
-// with the given SANs.
-func tlsChallengeCert(san ...string) (tls.Certificate, error) {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// with the given SANs and auto-generated public/private key pair.
+// To create a cert with a custom key pair, specify WithKey option.
+func tlsChallengeCert(san []string, opt []CertOption) (tls.Certificate, error) {
+	var (
+		key  crypto.Signer
+		tmpl *x509.Certificate
+	)
+	for _, o := range opt {
+		switch o := o.(type) {
+		case *certOptKey:
+			if key != nil {
+				return tls.Certificate{}, errors.New("acme: duplicate key option")
+			}
+			key = o.key
+		case *certOptTemplate:
+			var t = *(*x509.Certificate)(o) // shallow copy is ok
+			tmpl = &t
+		default:
+			// package's fault, if we let this happen:
+			panic(fmt.Sprintf("unsupported option type %T", o))
+		}
+	}
+	if key == nil {
+		var err error
+		if key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader); err != nil {
+			return tls.Certificate{}, err
+		}
+	}
+	if tmpl == nil {
+		tmpl = &x509.Certificate{
+			SerialNumber:          big.NewInt(1),
+			NotBefore:             time.Now(),
+			NotAfter:              time.Now().Add(24 * time.Hour),
+			BasicConstraintsValid: true,
+			KeyUsage:              x509.KeyUsageKeyEncipherment,
+		}
+	}
+	tmpl.DNSNames = san
+
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
-	t := x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageKeyEncipherment,
-		DNSNames:              san,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, &t, &t, &key.PublicKey, key)
 	return tls.Certificate{
 		Certificate: [][]byte{der},
 		PrivateKey:  key,
