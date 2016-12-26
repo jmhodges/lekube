@@ -16,13 +16,15 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/cenk/backoff"
 	"golang.org/x/crypto/acme"
+	"golang.org/x/time/rate"
 )
 
 type leClient struct {
-	cl              *acme.Client
+	cl              *limitedACMEClient
 	dir             acme.Directory
 	registrationURI string
 	responder       *leResponder
@@ -70,7 +72,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), de.dom, de.authURI)
 			alreadyAuthDomains[de.dom] = true
 		} else {
-			msg := fmt.Sprintf("failed to authorize domain %s: %s", sconf.FullName(), de.dom, de.err)
+			msg := fmt.Sprintf("in secret %s, failed to authorize domain %s: %s", sconf.FullName(), de.dom, de.err)
 			errs = append(errs, msg)
 		}
 	}
@@ -205,15 +207,20 @@ type leClientMaker struct {
 	httpClient *http.Client
 	accountKey *rsa.PrivateKey
 	responder  *leResponder
+	// limit is to match to the request-per-IP (supposedly,
+	// request-per-IP-per-endpoint, but it didn't seem to be) nginx rate limit
+	// Let's Encrypt put in place across all accounts and clients.
+	limit *rate.Limiter
 
 	infoToClient map[accountInfo]*leClient
 }
 
-func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leResponder) *leClientMaker {
+func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leResponder, limiter *rate.Limiter) *leClientMaker {
 	return &leClientMaker{
 		httpClient:   c,
 		accountKey:   accountKey,
 		responder:    responder,
+		limit:        limiter,
 		infoToClient: make(map[accountInfo]*leClient),
 	}
 }
@@ -242,10 +249,13 @@ func (lcm *leClientMaker) Make(ctx context.Context, directoryURL, email string) 
 		return lc, ensureTermsOfUse(ctx, lc)
 	}
 
-	cl := &acme.Client{
-		Key:          lcm.accountKey,
-		HTTPClient:   lcm.httpClient,
-		DirectoryURL: directoryURL,
+	cl := &limitedACMEClient{
+		limit: lcm.limit,
+		cl: &acme.Client{
+			Key:          lcm.accountKey,
+			HTTPClient:   lcm.httpClient,
+			DirectoryURL: directoryURL,
+		},
 	}
 	dir, err := cl.Discover(ctx)
 	if err != nil {
@@ -297,4 +307,66 @@ func uniqueDomains(doms []string) []string {
 		}
 	}
 	return newDoms
+}
+
+type limitedACMEClient struct {
+	limit *rate.Limiter
+	cl    *acme.Client
+}
+
+func (lac *limitedACMEClient) Discover(ctx context.Context) (acme.Directory, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return acme.Directory{}, err
+	}
+	return lac.cl.Discover(ctx)
+}
+
+func (lac *limitedACMEClient) CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, "", err
+	}
+	return lac.cl.CreateCert(ctx, csr, exp, bundle)
+}
+
+func (lac *limitedACMEClient) Authorize(ctx context.Context, domain string) (*acme.Authorization, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+
+	return lac.cl.Authorize(ctx, domain)
+}
+
+func (lac *limitedACMEClient) Accept(ctx context.Context, chal *acme.Challenge) (*acme.Challenge, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.Accept(ctx, chal)
+}
+
+func (lac *limitedACMEClient) GetAuthorization(ctx context.Context, url string) (*acme.Authorization, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.GetAuthorization(ctx, url)
+}
+
+func (lac *limitedACMEClient) GetReg(ctx context.Context, url string) (*acme.Account, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.GetReg(ctx, url)
+}
+
+func (lac *limitedACMEClient) UpdateReg(ctx context.Context, a *acme.Account) (*acme.Account, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.UpdateReg(ctx, a)
+}
+
+func (lac *limitedACMEClient) Register(ctx context.Context, a *acme.Account, prompt func(tosURL string) bool) (*acme.Account, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.Register(ctx, a, prompt)
 }
