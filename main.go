@@ -215,12 +215,22 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 	for _, secConf := range okaySecs {
 		log.Printf("checking on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
+		refreshCert := false
 		if tlsSec == nil {
 			log.Printf("no such secret %s", secConf.FullName())
+			refreshCert = true
 		} else if tlsSec.Cert == nil {
 			log.Printf("no tls.crt in secret %s", secConf.FullName())
+			refreshCert = true
+		} else if closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) {
+			log.Printf("cert close to expiration in secret %s, NotAfter: %s; Now: %s StartRenewDur: %s", secConf.FullName(), tlsSec.Cert.NotAfter, time.Now(), time.Duration(conf.StartRenewDur))
+			refreshCert = true
+		} else if domainMismatch(tlsSec.Cert, secConf.Domains) {
+			log.Printf("domain mismatch between cert and secret %s", secConf.FullName())
+			refreshCert = true
 		}
-		if tlsSec == nil || tlsSec.Cert == nil || closeToExpiration(tlsSec.Cert, time.Duration(conf.StartRenewDur)) || domainMismatch(tlsSec.Cert, secConf.Domains) {
+
+		if refreshCert {
 			log.Printf("working on %s", secConf.FullName())
 			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
 		} else {
@@ -357,7 +367,6 @@ func recordError(st stage, format string, args ...interface{}) {
 
 func closeToExpiration(cert *x509.Certificate, startRenewDur time.Duration) bool {
 	t := time.Now().Add(startRenewDur)
-	log.Printf("closeToExpiration, NotAfter: %s; StartRenewAt: %s", cert.NotAfter, t)
 	return t.Equal(cert.NotAfter) || t.After(cert.NotAfter)
 }
 
