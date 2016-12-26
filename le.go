@@ -220,7 +220,7 @@ func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leR
 		httpClient:   c,
 		accountKey:   accountKey,
 		responder:    responder,
-		limit:        rate.NewLimiter(rate.Limit(10), 10),
+		limit:        rate.NewLimiter(rate.Limit(3), 3),
 		infoToClient: make(map[accountInfo]*leClient),
 	}
 }
