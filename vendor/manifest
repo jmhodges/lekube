@@ -76,14 +76,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/howeyc/fsnotify",
-			"repository": "https://github.com/howeyc/fsnotify",
-			"vcs": "git",
-			"revision": "f0c08ee9c60704c1879025f2ae0ff3e000082c13",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/mattn/go-isatty",
 			"repository": "https://github.com/mattn/go-isatty",
 			"vcs": "git",
