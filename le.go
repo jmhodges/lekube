@@ -143,7 +143,7 @@ func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Auth
 		return nil, err
 	}
 	log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
-	lc.responder.AddAuthorization(ch.Token)
+	lc.responder.AddAuthorization(dom, ch.Token)
 	_, err = lc.cl.Accept(ctx, ch)
 	if err != nil {
 		return nil, fmt.Errorf("error during Accept of challenge: %s", err)
