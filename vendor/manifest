@@ -68,22 +68,6 @@
 			"notests": true
 		},
 		{
-			"importpath": "github.com/google/acme",
-			"repository": "https://github.com/google/acme",
-			"vcs": "git",
-			"revision": "405b837ccffc76ba14775a158136b4fc86083040",
-			"branch": "master",
-			"notests": true
-		},
-		{
-			"importpath": "github.com/howeyc/fsnotify",
-			"repository": "https://github.com/howeyc/fsnotify",
-			"vcs": "git",
-			"revision": "f0c08ee9c60704c1879025f2ae0ff3e000082c13",
-			"branch": "master",
-			"notests": true
-		},
-		{
 			"importpath": "github.com/mattn/go-isatty",
 			"repository": "https://github.com/mattn/go-isatty",
 			"vcs": "git",
@@ -165,10 +149,10 @@
 		},
 		{
 			"importpath": "golang.org/x/crypto/acme",
-			"repository": "https://go.googlesource.com/crypto",
+			"repository": "https://github.com/jmhodges/crypto",
 			"vcs": "git",
-			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
-			"branch": "master",
+			"revision": "1d4de5f62f01428a2e63b378a929e5954fd18458",
+			"branch": "safe",
 			"path": "/acme",
 			"notests": true
 		},
