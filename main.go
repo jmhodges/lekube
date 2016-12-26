@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/time/rate"
 	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	kubeapi "k8s.io/kubernetes/pkg/api/v1"
@@ -122,7 +123,8 @@ func main() {
 
 	kubeClient := kube13.NewForConfigOrDie(restConfig).Core()
 
-	lcm := newLEClientMaker(httpClient, accountKey, responder)
+	limit := rate.NewLimiter(rate.Limit(3), 3)
+	lcm := newLEClientMaker(httpClient, accountKey, responder, limit)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	_, err = lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 	if err != nil {

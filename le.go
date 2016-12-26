@@ -215,12 +215,12 @@ type leClientMaker struct {
 	infoToClient map[accountInfo]*leClient
 }
 
-func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leResponder) *leClientMaker {
+func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leResponder, limiter *rate.Limiter) *leClientMaker {
 	return &leClientMaker{
 		httpClient:   c,
 		accountKey:   accountKey,
 		responder:    responder,
-		limit:        rate.NewLimiter(rate.Limit(3), 3),
+		limit:        limiter,
 		infoToClient: make(map[accountInfo]*leClient),
 	}
 }
