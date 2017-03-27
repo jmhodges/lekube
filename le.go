@@ -144,7 +144,7 @@ func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Auth
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("adding authorization for %#v: token %#v", dom, ch.Token)
+	log.Printf("adding authorization for %#v, token %#v, url %s", dom, ch.Token, a.URI)
 	lc.responder.AddAuthorization(dom, ch.Token)
 	_, err = lc.cl.Accept(ctx, ch)
 	if err != nil {
@@ -154,6 +154,7 @@ func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Auth
 	b := backoff.NewExponentialBackOff()
 	op := func() error {
 		var err error
+		log.Printf("getting authorization for %#v, %#v at url %s", dom, ch.Token, a.URI)
 		a2, err = lc.cl.GetAuthorization(ctx, a.URI)
 		if err != nil {
 			return err
