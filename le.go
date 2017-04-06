@@ -62,7 +62,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 	errs := []string{}
 	for _, ch := range authResps {
 		var de domErr
-		select {
+		select { // TODO(jmhodges): remove this in favor of relying on ctx returning everywhere
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case de = <-ch:

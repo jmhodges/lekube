@@ -20,13 +20,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
+
+	"github.com/ericchiang/k8s"
 	"golang.org/x/time/rate"
-	kerrors "k8s.io/kubernetes/pkg/api/errors"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	kubeapi "k8s.io/kubernetes/pkg/api/v1"
-	kube13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
-	core13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 var (
@@ -116,12 +113,10 @@ func main() {
 		log.Fatalf("unable to make responder: %s", err)
 	}
 
-	restConfig, err := restclient.InClusterConfig()
+	kubeClient, err := k8s.NewInClusterClient()
 	if err != nil {
 		log.Fatalf("unable to make config for kubernetes client: %s", err)
 	}
-
-	kubeClient := kube13.NewForConfigOrDie(restConfig).Core()
 
 	limit := rate.NewLimiter(rate.Limit(3), 3)
 	lcm := newLEClientMaker(httpClient, accountKey, responder, limit)
@@ -191,7 +186,7 @@ func main() {
 	}
 }
 
-func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
+func run(lcm *leClientMaker, client *k8s.Client, conf *allConf, leTimeout time.Duration) {
 	runCount.Add(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
