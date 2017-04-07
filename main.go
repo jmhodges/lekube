@@ -20,9 +20,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/unversioned"
-
 	"github.com/ericchiang/k8s"
+	k8sv1 "github.com/ericchiang/k8s/api/v1"
+	k8smetav1 "github.com/ericchiang/k8s/apis/meta/v1"
 	"golang.org/x/time/rate"
 )
 
@@ -186,15 +186,17 @@ func main() {
 	}
 }
 
-func run(lcm *leClientMaker, client *k8s.Client, conf *allConf, leTimeout time.Duration) {
+func run(lcm *leClientMaker, mainClient *k8s.Client, conf *allConf, leTimeout time.Duration) {
 	runCount.Add(1)
 	lcm.responder.Reset()
+	client := mainClient.CoreV1()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
+	ctx := context.Background() // TODO(jmhodges): set a timeout for all of this.
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		fetchSecretAttempts.Add(1)
-		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
+		tlsSec, err := fetchK8SSecret(ctx, client, secConf)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
@@ -234,7 +236,7 @@ func run(lcm *leClientMaker, client *k8s.Client, conf *allConf, leTimeout time.D
 	}
 }
 
-func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
+func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client *k8s.CoreV1, conf *allConf, leTimeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
 
@@ -251,13 +253,13 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[strin
 	}
 	fetchLECertSuccesses.Add(1)
 	log.Printf("have new cert for %s", secConf.FullName())
-	var oldSec *kubeapi.Secret
+	var oldSec *k8sv1.Secret
 	if tlsSec != nil {
 		oldSec = tlsSec.Secret
 	}
 
 	storeSecretAttempts.Add(1)
-	err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
+	err = storeK8SSecret(ctx, client, secConf, oldSec, leCert)
 	if err != nil {
 		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return
@@ -266,12 +268,14 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[strin
 	log.Printf("successfully stored new cert in %s", secConf.FullName())
 }
 
+const reasonNotFound = "NotFound"
+
 // fetchK8SSecret may return a nil tlsSecret if no secret was found.
-func fetchK8SSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
-	sec, err := client.Get(secretName)
+func fetchK8SSecret(ctx context.Context, client *k8s.CoreV1, secConf *secretConf) (*tlsSecret, error) {
+	sec, err := client.GetSecret(ctx, secConf.Name, *secConf.Namespace)
 	if err != nil {
-		serr, ok := err.(*kerrors.StatusError)
-		if ok && serr.ErrStatus.Reason == unversioned.StatusReasonNotFound {
+		serr, ok := err.(*k8s.APIError)
+		if ok && serr.Status.Reason != nil && *serr.Status.Reason == reasonNotFound {
 			return nil, nil
 		}
 		return nil, err
@@ -306,14 +310,15 @@ func fetchK8SSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	return tlsSec, nil
 }
 
-func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
-	f := cl.Update
+func storeK8SSecret(ctx context.Context, cl *k8s.CoreV1, secConf *secretConf, oldSec *k8sv1.Secret, leCert *newCert) error {
+	f := cl.UpdateSecret
 	sec := oldSec
 	if oldSec == nil {
-		f = cl.Create
-		sec = &kubeapi.Secret{
-			ObjectMeta: kubeapi.ObjectMeta{
-				Name: secConf.Name,
+		f = cl.CreateSecret
+		sec = &k8sv1.Secret{
+			Metadata: &k8smetav1.ObjectMeta{
+				Name:      &secConf.Name,
+				Namespace: secConf.Namespace,
 			},
 			Data: make(map[string][]byte),
 		}
@@ -324,7 +329,7 @@ func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kube
 
 	sec.Data["tls.crt"] = leCert.Cert
 	sec.Data["tls.key"] = leCert.Key
-	_, err := f(sec)
+	_, err := f(ctx, sec)
 	return err
 }
 
@@ -335,7 +340,7 @@ type newCert struct {
 
 type tlsSecret struct {
 	Cert *x509.Certificate
-	*kubeapi.Secret
+	*k8sv1.Secret
 }
 
 type stage int

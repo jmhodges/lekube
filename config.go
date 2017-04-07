@@ -164,6 +164,7 @@ type allConf struct {
 }
 
 type secretConf struct {
+	// Namespace run through validateConfig will always be non-nil.
 	Namespace *string  `json:"namespace"`
 	Name      string   `json:"name"`
 	Domains   []string `json:"domains"`
