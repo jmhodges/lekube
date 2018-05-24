@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenk/backoff"
+	"github.com/cenkalti/backoff"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/time/rate"
 )
@@ -151,7 +151,7 @@ func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Auth
 		return nil, fmt.Errorf("error during Accept of challenge: %s", err)
 	}
 	var a2 *acme.Authorization
-	b := backoff.NewExponentialBackOff()
+	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
 	op := func() error {
 		var err error
 		log.Printf("getting authorization for %#v, token %#v, url %s", dom, ch.Token, a.URI)
