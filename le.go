@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -183,9 +182,7 @@ func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Auth
 func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAlgorithm) ([]byte, error) {
 	csr := &x509.CertificateRequest{
 		SignatureAlgorithm: sigAlg,
-
-		Subject:  pkix.Name{CommonName: domains[0]},
-		DNSNames: domains,
+		DNSNames:           domains,
 	}
 
 	return x509.CreateCertificateRequest(rand.Reader, csr, priv)
