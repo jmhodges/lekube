@@ -212,9 +212,9 @@ func (d jsonDuration) String() string {
 
 func dirURLFromConf(conf *allConf) string {
 	if *conf.UseProd {
-		return "https://acme-v01.api.letsencrypt.org/directory"
+		return "https://acme-v02.api.letsencrypt.org/directory"
 	}
-	return "https://acme-staging.api.letsencrypt.org/directory"
+	return "https://acme-staging-v02.api.letsencrypt.org/directory"
 }
 
 func unmarshalConf(fp string) (*allConf, error) {
