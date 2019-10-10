@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-	kerrors "k8s.io/kubernetes/pkg/api/errors"
-	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
-	kubeapi "k8s.io/kubernetes/pkg/api/v1"
-	kube13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
-	core13 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	kubeapi "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8s "k8s.io/client-go/kubernetes"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	restclient "k8s.io/client-go/rest"
 )
 
 var (
@@ -121,7 +121,7 @@ func main() {
 		log.Fatalf("unable to make config for kubernetes client: %s", err)
 	}
 
-	kubeClient := kube13.NewForConfigOrDie(restConfig).Core()
+	kubeClient := k8s.NewForConfigOrDie(restConfig).CoreV1()
 
 	limit := rate.NewLimiter(rate.Limit(3), 3)
 	lcm := newLEClientMaker(httpClient, accountKey, responder, limit)
@@ -191,7 +191,7 @@ func main() {
 	}
 }
 
-func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
+func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
 	runCount.Add(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
@@ -239,7 +239,7 @@ func run(lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeo
 	}
 }
 
-func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client core13.CoreInterface, conf *allConf, leTimeout time.Duration) {
+func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
 
@@ -272,11 +272,10 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[strin
 }
 
 // fetchK8SSecret may return a nil tlsSecret if no secret was found.
-func fetchK8SSecret(client core13.SecretInterface, secretName string) (*tlsSecret, error) {
-	sec, err := client.Get(secretName)
+func fetchK8SSecret(client corev1.SecretInterface, secretName string) (*tlsSecret, error) {
+	sec, err := client.Get(secretName, metav1.GetOptions{})
 	if err != nil {
-		serr, ok := err.(*kerrors.StatusError)
-		if ok && serr.ErrStatus.Reason == unversioned.StatusReasonNotFound {
+		if kerrors.IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
@@ -311,13 +310,13 @@ func fetchK8SSecret(client core13.SecretInterface, secretName string) (*tlsSecre
 	return tlsSec, nil
 }
 
-func storeK8SSecret(cl core13.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
+func storeK8SSecret(cl corev1.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
 	f := cl.Update
 	sec := oldSec
 	if oldSec == nil {
 		f = cl.Create
 		sec = &kubeapi.Secret{
-			ObjectMeta: kubeapi.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: secConf.Name,
 			},
 			Data: make(map[string][]byte),

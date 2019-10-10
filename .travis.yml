@@ -4,6 +4,9 @@ go:
 
 sudo: required
 
+env:
+  - GO111MODULES=on
+
 services:
   - docker
 
