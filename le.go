@@ -197,7 +197,7 @@ func findChallenge(a *acme.Authorization) (*acme.Challenge, error) {
 			return a.Challenges[comb[0]], nil
 		}
 	}
-	return nil, fmt.Errorf("no challenge combination of just http. challenges: %s, combinations: %v", a.Challenges, a.Combinations)
+	return nil, fmt.Errorf("no challenge combination of just http. challenges: %v, combinations: %v", a.Challenges, a.Combinations)
 }
 
 // leClientMaker allows us to change the ACME (Let's Encrypt) API url and
