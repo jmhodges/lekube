@@ -14,7 +14,7 @@ branches:
     - /^test-/
 
 install:
-  - go test -i .
+  - go test -race -i .
 
 script:
-  - go test . && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.buildSHA=${TRAVIS_COMMIT}" . && ./travis_docker_push.sh
+  - go test -race . && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.buildSHA=${TRAVIS_COMMIT}" . && ./travis_docker_push.sh
