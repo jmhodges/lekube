@@ -138,6 +138,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Authorization, error) {
 	a, err := lc.cl.Authorize(ctx, dom)
 	if err != nil {
+		log.Printf("error during actual Authorize call for %#v: %s (%#v)", dom, err, err)
 		return nil, err
 	}
 	ch, err := findChallenge(a)
