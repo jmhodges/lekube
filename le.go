@@ -16,7 +16,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"golang.org/x/crypto/acme"
 	"golang.org/x/time/rate"
@@ -41,7 +40,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf) (*newCert
 		authURI string
 	}
 	log.Printf("attempting to authorize secret %s with domains %s", sconf.FullName(), domains)
-	_, err := lc.authorizeDomains(ctx, domains)
+	order, err := lc.authorizeDomains(ctx, domains)
 	if err != nil {
 		err = fmt.Errorf("in secret %s, failed to authorize order of domains %s: %s", sconf.FullName(), domains, err)
 
@@ -83,7 +82,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf) (*newCert
 		return nil, err
 	}
 
-	certDERs, _, err := lc.cl.CreateCert(ctx, csrDER, 0, true)
+	certDERs, _, err := lc.cl.CreateOrderCert(ctx, order.FinalizeURL, csrDER, true)
 	if err != nil {
 		return nil, err
 	}
@@ -134,16 +133,12 @@ func (lc *leClient) authorizeDomains(ctx context.Context, domains []string) (*ac
 	if err != nil {
 		return nil, fmt.Errorf("error during WaitOrder for domains %s, order URI %s: %s", domains, order.URI, err)
 	}
-	if afterOrder == nil {
-		return nil, errors.New("a nil authorization happened somehow")
-	}
 	if afterOrder.Status == acme.StatusInvalid {
 		return nil, fmt.Errorf("authorization marked as invalid")
 	}
-	if afterOrder.Status != acme.StatusValid {
-		return nil, fmt.Errorf("authorization order URI %s in state %s at timeout expiration", order.URI, afterOrder.Status)
+	if afterOrder.Status != acme.StatusReady {
+		return nil, fmt.Errorf("authorization order URI %s: want state %s, got %s at timeout expiration", order.URI, acme.StatusReady, afterOrder.Status)
 	}
-
 	return afterOrder, nil
 }
 
@@ -291,11 +286,11 @@ func (lac *limitedACMEClient) Discover(ctx context.Context) (acme.Directory, err
 	return lac.cl.Discover(ctx)
 }
 
-func (lac *limitedACMEClient) CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error) {
+func (lac *limitedACMEClient) CreateOrderCert(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error) {
 	if err := lac.limit.Wait(ctx); err != nil {
 		return nil, "", err
 	}
-	return lac.cl.CreateCert(ctx, csr, exp, bundle)
+	return lac.cl.CreateOrderCert(ctx, url, csr, bundle)
 }
 
 func (lac *limitedACMEClient) AuthorizeOrder(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (*acme.Order, error) {
