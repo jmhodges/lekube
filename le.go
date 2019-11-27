@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/time/rate"
 )
@@ -30,7 +29,7 @@ type leClient struct {
 	responder       *leResponder
 }
 
-func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAuthDomains map[string]bool) (*newCert, error) {
+func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf) (*newCert, error) {
 	if len(sconf.Domains) == 0 {
 		return nil, fmt.Errorf("cannot request a certificate with no names")
 	}
@@ -41,44 +40,12 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 		err     error
 		authURI string
 	}
-	authResps := []chan domErr{}
-	for _, dom := range domains {
-		if alreadyAuthDomains[dom] {
-			continue
-		}
-		log.Printf("attempting to authorize %s:%s", sconf.FullName(), dom)
-		ch := make(chan domErr, 1)
-		authResps = append(authResps, ch)
-		go func(dom string) {
-			a, err := lc.authorizeDomain(ctx, dom)
-			de := domErr{dom: dom, err: err}
-			if err == nil {
-				de.authURI = a.URI
-			}
-			ch <- de
-		}(dom)
-	}
+	log.Printf("attempting to authorize secret %s with domains %s", sconf.FullName(), domains)
+	_, err := lc.authorizeDomains(ctx, domains)
+	if err != nil {
+		err = fmt.Errorf("in secret %s, failed to authorize order of domains %s: %s", sconf.FullName(), domains, err)
 
-	errs := []string{}
-	for _, ch := range authResps {
-		var de domErr
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case de = <-ch:
-		}
-
-		if de.err == nil {
-			log.Printf("authorized domain %s:%s: %s", sconf.FullName(), de.dom, de.authURI)
-			alreadyAuthDomains[de.dom] = true
-		} else {
-			msg := fmt.Sprintf("in secret %s, failed to authorize domain %s: %s", sconf.FullName(), de.dom, de.err)
-			errs = append(errs, msg)
-		}
-	}
-
-	if len(errs) != 0 {
-		return nil, fmt.Errorf("%s", errs)
+		return nil, err
 	}
 
 	var priv crypto.PrivateKey
@@ -106,7 +73,7 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 		sigAlg = x509.ECDSAWithSHA256
 	}
 	keyOut := &bytes.Buffer{}
-	err := pem.Encode(keyOut, pblock)
+	err = pem.Encode(keyOut, pblock)
 	if err != nil {
 		return nil, err
 	}
@@ -135,50 +102,49 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf, alreadyAu
 	return nc, nil
 }
 
-func (lc *leClient) authorizeDomain(ctx context.Context, dom string) (*acme.Authorization, error) {
-	a, err := lc.cl.Authorize(ctx, dom)
+func (lc *leClient) authorizeDomains(ctx context.Context, domains []string) (*acme.Order, error) {
+	authzIDs := make([]acme.AuthzID, len(domains))
+	for i, dom := range domains {
+		authzIDs[i] = acme.AuthzID{Type: "dns", Value: dom}
+	}
+	order, err := lc.cl.AuthorizeOrder(ctx, authzIDs)
 	if err != nil {
-		log.Printf("error during actual Authorize call for %#v: %s (%#v)", dom, err, err)
+		log.Printf("error during AuthorizeOrder call for domains %s: %s (%#v)", domains, err, err)
 		return nil, err
 	}
-	ch, err := findChallenge(a)
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("adding authorization for %#v, token %#v, url %s", dom, ch.Token, a.URI)
-	lc.responder.AddAuthorization(dom, ch.Token)
-	_, err = lc.cl.Accept(ctx, ch)
-	if err != nil {
-		return nil, fmt.Errorf("error during Accept of challenge: %s", err)
-	}
-	var a2 *acme.Authorization
-	b := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
-	op := func() error {
-		var err error
-		log.Printf("getting authorization for %#v, token %#v, url %s", dom, ch.Token, a.URI)
-		a2, err = lc.cl.GetAuthorization(ctx, a.URI)
+
+	for i, azURL := range order.AuthzURLs {
+		a, err := lc.cl.GetAuthorization(ctx, azURL)
 		if err != nil {
-			return err
+			log.Printf("error during GetAuthorization call for authz url %s (likely for domain %s of %s): %s", azURL, domains[i], domains, err)
 		}
-		if a2.Status == acme.StatusValid || a2.Status == acme.StatusInvalid {
-			return nil
+		ch, err := findChallenge(a)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find matching challenge for authz of domain %s (authz URL %s): %s", a.Identifier.Value, azURL, domains, err)
 		}
-		return errors.New("authorization still pending")
+		log.Printf("adding authorization for %#v, token %#v, authz url %s", a.Identifier.Value, ch.Token, a.URI)
+		lc.responder.AddAuthorization(a.Identifier.Value, ch.Token)
+		_, err = lc.cl.Accept(ctx, ch)
+		if err != nil {
+			return nil, fmt.Errorf("error during Accept of challenge for %s: %s", a.Identifier.Value, err)
+		}
 	}
-	err = backoff.Retry(op, b)
+
+	afterOrder, err := lc.cl.WaitOrder(ctx, order.URI)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error during WaitOrder for domains %s, order URI %s: %s", domains, order.URI, err)
 	}
-	if a2 == nil {
+	if afterOrder == nil {
 		return nil, errors.New("a nil authorization happened somehow")
 	}
-	if a2.Status == acme.StatusInvalid {
+	if afterOrder.Status == acme.StatusInvalid {
 		return nil, fmt.Errorf("authorization marked as invalid")
 	}
-	if a2.Status != acme.StatusValid {
-		return nil, fmt.Errorf("authorization for %#v in state %s at timeout expiration", dom, a2.Status)
+	if afterOrder.Status != acme.StatusValid {
+		return nil, fmt.Errorf("authorization for domains (order URI %s) in state %s at timeout expiration", domains, order.URI, afterOrder.Status)
 	}
-	return a2, nil
+
+	return afterOrder, nil
 }
 
 func createCSR(domains []string, priv crypto.PrivateKey, sigAlg x509.SignatureAlgorithm) ([]byte, error) {
@@ -330,12 +296,12 @@ func (lac *limitedACMEClient) CreateCert(ctx context.Context, csr []byte, exp ti
 	return lac.cl.CreateCert(ctx, csr, exp, bundle)
 }
 
-func (lac *limitedACMEClient) Authorize(ctx context.Context, domain string) (*acme.Authorization, error) {
+func (lac *limitedACMEClient) AuthorizeOrder(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (*acme.Order, error) {
 	if err := lac.limit.Wait(ctx); err != nil {
 		return nil, err
 	}
 
-	return lac.cl.Authorize(ctx, domain)
+	return lac.cl.AuthorizeOrder(ctx, id, opt...)
 }
 
 func (lac *limitedACMEClient) Accept(ctx context.Context, chal *acme.Challenge) (*acme.Challenge, error) {
@@ -371,4 +337,11 @@ func (lac *limitedACMEClient) Register(ctx context.Context, a *acme.Account, pro
 		return nil, err
 	}
 	return lac.cl.Register(ctx, a, prompt)
+}
+
+func (lac *limitedACMEClient) WaitOrder(ctx context.Context, url string) (*acme.Order, error) {
+	if err := lac.limit.Wait(ctx); err != nil {
+		return nil, err
+	}
+	return lac.cl.WaitOrder(ctx, url)
 }
