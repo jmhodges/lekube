@@ -211,7 +211,6 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 		okaySecs = append(okaySecs, secConf)
 	}
 
-	alreadyAuthDomains := make(map[string]bool)
 	for _, secConf := range okaySecs {
 		log.Printf("checking on %s", secConf.FullName())
 		tlsSec := tlsSecs[secConf.FullName()]
@@ -232,14 +231,14 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 
 		if refreshCert {
 			log.Printf("working on %s", secConf.FullName())
-			workOn(tlsSec, secConf, alreadyAuthDomains, lcm, client, conf, leTimeout)
+			workOn(tlsSec, secConf, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
 		}
 	}
 }
 
-func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[string]bool, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
+func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
 
@@ -249,7 +248,7 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, alreadyAuthDomains map[strin
 		recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
 		return
 	}
-	leCert, err := acmeClient.CreateCert(ctx, secConf, alreadyAuthDomains)
+	leCert, err := acmeClient.CreateCert(ctx, secConf)
 	if err != nil {
 		recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 		return
