@@ -116,11 +116,11 @@ func (lc *leClient) authorizeDomains(ctx context.Context, domains []string) (*ac
 	for i, azURL := range order.AuthzURLs {
 		a, err := lc.cl.GetAuthorization(ctx, azURL)
 		if err != nil {
-			log.Printf("error during GetAuthorization call for authz url %s (likely for domain %s of %s): %s", azURL, domains[i], domains, err)
+			log.Printf("error during GetAuthorization call for authz url %s (likely for domain %s): %s", azURL, domains[i], err)
 		}
 		ch, err := findChallenge(a)
 		if err != nil {
-			return nil, fmt.Errorf("unable to find matching challenge for authz of domain %s (authz URL %s): %s", a.Identifier.Value, azURL, domains, err)
+			return nil, fmt.Errorf("unable to find matching challenge for authz of domain %s (authz URL %s): %s", a.Identifier.Value, azURL, err)
 		}
 		log.Printf("adding authorization for %#v, token %#v, authz url %s", a.Identifier.Value, ch.Token, a.URI)
 		lc.responder.AddAuthorization(a.Identifier.Value, ch.Token)
@@ -141,7 +141,7 @@ func (lc *leClient) authorizeDomains(ctx context.Context, domains []string) (*ac
 		return nil, fmt.Errorf("authorization marked as invalid")
 	}
 	if afterOrder.Status != acme.StatusValid {
-		return nil, fmt.Errorf("authorization for domains (order URI %s) in state %s at timeout expiration", domains, order.URI, afterOrder.Status)
+		return nil, fmt.Errorf("authorization order URI %s in state %s at timeout expiration", order.URI, afterOrder.Status)
 	}
 
 	return afterOrder, nil
