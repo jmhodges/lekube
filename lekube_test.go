@@ -11,7 +11,7 @@ import (
 
 func TestConfigLoadGoldenPath(t *testing.T) {
 	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
-	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json", fakeInt, fakeInt)
+	cl, c, err := newConfLoader("./testdata/test.json", fakeInt, fakeInt)
 	if err != nil {
 		t.Fatal(err)
 	}
