@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.opencensus.io/stats"
 )
 
 // newConfLoader does I/O immediately to validate the config file at the given
@@ -25,32 +26,29 @@ import (
 // that file path and that would cause a reboot and another account
 // acquisition. That's a bummer. So, take the L and load the config file here
 // and let Watch eat and record the errors.
-func newConfLoader(fp string) (*confLoader, *allConf, error) {
+func newConfLoader(fp string, lastCheck, lastChange *stats.Int64Measure) (*confLoader, *allConf, error) {
 	cl := &confLoader{
 		path:       fp,
-		lastCheck:  &unixEpoch{},
-		lastChange: &unixEpoch{},
-		attempts:   &expvar.Int{},
-		successes:  &expvar.Int{},
+		lastCheck:  lastCheck,
+		lastChange: lastChange,
 	}
 	err := cl.load()
 	if err != nil {
-		loadConfigErrors.Add(1)
+		loadConfigErrors.M(1)
 		return nil, nil, err
 	}
-	cl.successes.Add(1)
+	loadConfigSuccesses.M(1)
 	return cl, cl.Get(), nil
 }
 
 type confLoader struct {
 	path      string
-	lastCheck *unixEpoch
-	attempts  *expvar.Int
-	successes *expvar.Int
+	lastCheck *stats.Int64Measure
 
 	// loadMu locks calls to confLoader.load, but doesn't prevent concurrent
-	// reads of confLoader.conf. This allows us to prevent multiple reads of the
-	// config file on disk without blocking calls to confloader.Get on file I/O.
+	// reads of confLoader.conf (that's handled by confMu). This allows us to
+	// prevent multiple reads of the config file on disk without blocking calls
+	// to confloader.Get on file I/O.
 	loadMu sync.Mutex
 
 	// confMu locks the writes and reads of lastChange, lastHash, and, most
@@ -59,11 +57,12 @@ type confLoader struct {
 	// of the file and one with and older version setting the conf at a later
 	// time than the others.
 	confMu     sync.Mutex
-	lastChange *unixEpoch
+	lastChange *stats.Int64Measure
 	lastHash   [sha256.Size]byte
 	conf       *allConf
 }
 
+// FIXME make it return the struct, for race condition reasons.
 func (cl *confLoader) Get() *allConf {
 	cl.confMu.Lock()
 	defer cl.confMu.Unlock()
@@ -76,7 +75,7 @@ func (cl *confLoader) Get() *allConf {
 func (cl *confLoader) Watch() *allConf {
 	var prevErr error
 	for {
-		cl.attempts.Add(1)
+		loadConfigAttempts.M(1)
 		start := time.Now()
 		err := cl.load()
 		c := cl.Get()
@@ -85,7 +84,7 @@ func (cl *confLoader) Watch() *allConf {
 				log.Printf("previous config file error resolved and load was successful")
 			}
 			prevErr = nil
-			cl.successes.Add(1)
+			loadConfigSuccesses.M(1)
 			return c
 		}
 
@@ -102,14 +101,14 @@ func (cl *confLoader) Watch() *allConf {
 				// If the last load where the config had actually changed was
 				// successful, then the good conf remained in place in this load
 				// and we can record it as a success.
-				cl.successes.Add(1)
+				loadConfigSuccesses.M(1)
 			} else {
 				// If the last load where the config had actually changed was in
 				// error, then the bad conf remained, so we can record this load
 				// as an error. However, we don't want the logs consumed
 				// entirely with repeated error messages, so just increment the
 				// stat.
-				loadConfigErrors.Add(1)
+				loadConfigErrors.M(1)
 			}
 		} else {
 			prevErr = err
@@ -125,7 +124,7 @@ func (cl *confLoader) load() error {
 	cl.loadMu.Lock()
 	defer cl.loadMu.Unlock()
 
-	cl.lastCheck.Set(time.Now().UnixNano())
+	cl.lastCheck.M(time.Now().UnixNano())
 	b, err := ioutil.ReadFile(cl.path)
 	if err != nil {
 		return err
@@ -149,7 +148,7 @@ func (cl *confLoader) load() error {
 
 	cl.conf = conf
 	cl.lastHash = h
-	cl.lastChange.Set(time.Now().UnixNano())
+	cl.lastChange.M(time.Now().UnixNano())
 	return nil
 }
 

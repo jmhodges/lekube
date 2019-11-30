@@ -5,10 +5,13 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"go.opencensus.io/stats"
 )
 
 func TestConfigLoadGoldenPath(t *testing.T) {
-	cl, c, err := newConfLoader("./testdata/test.json")
+	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
+	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json", fakeInt, fakeInt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +75,8 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 }
 
 func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
-	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json")
+	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
+	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json", fakeInt, fakeInt)
 	if err != nil {
 		t.Fatal(err)
 	}

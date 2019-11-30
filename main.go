@@ -21,7 +21,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/stats"
+	"go.opencensus.io/stats/view"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/time/rate"
 	kubeapi "k8s.io/api/core/v1"
@@ -39,29 +42,29 @@ var (
 	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
 	fetchLECertPrefix    = "stages/fetch-cert/"
-	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.")
-	fetchLECertErrors    = stats.Int64(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.")
-	fetchLECertSuccesses = stats.Int64(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.")
+	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
+	fetchLECertErrors    = stats.Int64(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
+	fetchLECertSuccesses = stats.Int64(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
 
 	fetchSecretPrefix    = "stages/fetch-secret/"
-	fetchSecretAttempts  = stats.Int64(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.")
-	fetchSecretErrors    = stats.Int64(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.")
-	fetchSecretSuccesses = stats.Int64(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.")
+	fetchSecretAttempts  = stats.Int64(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.", stats.UnitDimensionless)
+	fetchSecretErrors    = stats.Int64(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.", stats.UnitDimensionless)
+	fetchSecretSuccesses = stats.Int64(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.", stats.UnitDimensionless)
 
 	storeSecretPrefix    = "stages/store-secret/"
-	storeSecretAttempts  = stats.Int64(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.")
-	storeSecretErrors    = stats.Int64(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.")
-	storeSecretSuccesses = stats.Int64(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.")
-	storeSecretUpdates   = stats.Int64(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.")
-	storeSecretCreates   = stats.Int64(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.")
+	storeSecretAttempts  = stats.Int64(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.", stats.UnitDimensionless)
+	storeSecretErrors    = stats.Int64(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.", stats.UnitDimensionless)
+	storeSecretSuccesses = stats.Int64(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.", stats.UnitDimensionless)
+	storeSecretUpdates   = stats.Int64(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.", stats.UnitDimensionless)
+	storeSecretCreates   = stats.Int64(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.", stats.UnitDimensionless)
 
 	loadConfigPrefix    = "stages/load-config/"
-	loadConfigAttempts  = stats.Int64(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.")
-	loadConfigErrors    = stats.Int64(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.")
-	loadConfigSuccesses = stats.Int64(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.")
+	loadConfigAttempts  = stats.Int64(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.", stats.UnitDimensionless)
+	loadConfigErrors    = stats.Int64(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.", stats.UnitDimensionless)
+	loadConfigSuccesses = stats.Int64(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.", stats.UnitDimensionless)
 
-	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.")
-	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.")
+	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.", stats.UnitDimensionless)
+	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.", stats.UnitDimensionless)
 	buildSHA   = "<debug>"
 )
 
@@ -90,20 +93,17 @@ func main() {
 			ProjectID: creds.ProjectID,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to create Stackdriver opencensus exporter: %s", err)
+			log.Fatalf("unable to create Stackdriver opencensus exporter: %s", err)
 		}
 		view.RegisterExporter(exporter)
 	}
 
-	cLoader, conf, err := newConfLoader(*confPath)
+	lastCheck := stats.Int64("last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
+	lastChange := stats.Int64("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
+	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
-
-	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
-	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
-	loadConfigMetrics.Set("last_config_change", cLoader.lastChange)
-	loadConfigMetrics.Set("last_config_change_str", unixTime{unixEpoch: cLoader.lastChange})
 
 	accountKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -194,19 +194,19 @@ func main() {
 }
 
 func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
-	runCount.Add(1)
+	runCount.M(1)
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		fetchSecretAttempts.Add(1)
+		fetchSecretAttempts.M(1)
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
-		fetchSecretSuccesses.Add(1)
+		fetchSecretSuccesses.M(1)
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
 
 		tlsSecs[secConf.FullName()] = tlsSec
@@ -244,7 +244,7 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client c
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
 
-	fetchLECertAttempts.Add(1)
+	fetchLECertAttempts.M(1)
 	acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
 		recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
@@ -255,20 +255,20 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client c
 		recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 		return
 	}
-	fetchLECertSuccesses.Add(1)
+	fetchLECertSuccesses.M(1)
 	log.Printf("have new cert for %s", secConf.FullName())
 	var oldSec *kubeapi.Secret
 	if tlsSec != nil {
 		oldSec = tlsSec.Secret
 	}
 
-	storeSecretAttempts.Add(1)
+	storeSecretAttempts.M(1)
 	err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 	if err != nil {
 		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return
 	}
-	storeSecretSuccesses.Add(1)
+	storeSecretSuccesses.M(1)
 	log.Printf("successfully stored new cert in %s", secConf.FullName())
 }
 
@@ -322,9 +322,9 @@ func storeK8SSecret(cl corev1.SecretInterface, secConf *secretConf, oldSec *kube
 			},
 			Data: make(map[string][]byte),
 		}
-		storeSecretCreates.Add(1)
+		storeSecretCreates.M(1)
 	} else {
-		storeSecretUpdates.Add(1)
+		storeSecretUpdates.M(1)
 	}
 
 	sec.Data["tls.crt"] = leCert.Cert
@@ -352,7 +352,7 @@ const (
 	loadConfigStage
 )
 
-var stageErrors = map[stage]*expvar.Int{
+var stageErrors = map[stage]*stats.Int64Measure{
 	fetchSecStage:    fetchSecretErrors,
 	fetchLECertStage: fetchLECertErrors,
 	storeSecStage:    storeSecretErrors,
@@ -360,8 +360,8 @@ var stageErrors = map[stage]*expvar.Int{
 }
 
 func recordError(st stage, format string, args ...interface{}) {
-	errorCount.Add(1)
-	stageErrors[st].Add(1)
+	errorCount.M(1)
+	stageErrors[st].M(1)
 	log.Printf(format, args...)
 }
 
