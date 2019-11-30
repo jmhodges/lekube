@@ -3,7 +3,6 @@ module github.com/jmhodges/lekube
 go 1.13
 
 require (
-	github.com/cenkalti/backoff v1.0.1-0.20170309153948-3db60c813733
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 	gopkg.in/square/go-jose.v1 v1.0.2
