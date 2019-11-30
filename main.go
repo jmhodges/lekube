@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"expvar"
 	"flag"
 	"fmt"
 	"log"
@@ -16,13 +15,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/examples/exporter"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"golang.org/x/oauth2/google"
@@ -65,7 +63,11 @@ var (
 
 	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.", stats.UnitDimensionless)
 	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.", stats.UnitDimensionless)
-	buildSHA   = "<debug>"
+
+	lastCheck  = stats.Int64("last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
+	lastChange = stats.Int64("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
+
+	buildSHA = "<debug>"
 )
 
 func main() {
@@ -74,6 +76,12 @@ func main() {
 		log.Printf("-conf flag is required")
 		flag.Usage()
 		os.Exit(2)
+	}
+
+	usePrintTracer := os.Getenv("USE_PRINT_EXPORTER") != ""
+	if usePrintTracer {
+		exporter := &exporter.PrintExporter{}
+		view.RegisterExporter(exporter)
 	}
 
 	view.SetReportingPeriod(1 * time.Minute)
@@ -98,8 +106,24 @@ func main() {
 		view.RegisterExporter(exporter)
 	}
 
-	lastCheck := stats.Int64("last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
-	lastChange := stats.Int64("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
+	statViews := countViews(
+		fetchSecretAttempts,
+		fetchSecretErrors,
+		fetchSecretSuccesses,
+		storeSecretAttempts,
+		storeSecretErrors,
+		storeSecretSuccesses,
+		storeSecretUpdates,
+		storeSecretCreates,
+		loadConfigAttempts,
+		loadConfigErrors,
+		loadConfigSuccesses,
+	)
+
+	statViews = append(statViews, latestViews(lastCheck, lastChange)...)
+	if err := view.Register(statViews...); err != nil {
+		log.Fatalf("unable to register the opencensus stat views: %s", err)
+	}
 	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
@@ -396,28 +420,28 @@ func isBlockedRequest(r *http.Request) bool {
 	return false
 }
 
-var _ expvar.Var = &unixEpoch{}
-var _ expvar.Var = &unixTime{}
-
-// unixEpoch is a nanoseconds since Unix epoch variable that satisfies the expvar.Var interface.
-type unixEpoch struct {
-	i int64
+func countViews(measures ...*stats.Int64Measure) []*view.View {
+	out := make([]*view.View, len(measures))
+	for i, m := range measures {
+		out[i] = &view.View{
+			Name:        m.Name(),
+			Description: m.Description(),
+			Measure:     m,
+			Aggregation: view.Count(),
+		}
+	}
+	return out
 }
 
-func (v *unixEpoch) String() string {
-	return strconv.FormatInt(atomic.LoadInt64(&v.i), 10)
-}
-
-func (v *unixEpoch) Set(value int64) {
-	atomic.StoreInt64(&v.i, value)
-}
-
-// unixTime is a wrapper for unixEpoch to format its string as a
-// RFC3339 timestamp that satisfies the expvar.Var interface
-type unixTime struct {
-	*unixEpoch
-}
-
-func (u unixTime) String() string {
-	return time.Unix(0, u.unixEpoch.i).Format(time.RFC3339)
+func latestViews(measures ...*stats.Int64Measure) []*view.View {
+	out := make([]*view.View, len(measures))
+	for i, m := range measures {
+		out[i] = &view.View{
+			Name:        m.Name(),
+			Description: m.Description(),
+			Measure:     m,
+			Aggregation: view.LastValue(),
+		}
+	}
+	return out
 }
