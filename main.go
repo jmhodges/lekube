@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"expvar"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -20,6 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opencensus.io/stats"
+	"golang.org/x/oauth2/google"
 	"golang.org/x/time/rate"
 	kubeapi "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,28 +38,31 @@ var (
 	httpsAddr    = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
 	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
-	fetchSecretAttempts  = &expvar.Int{}
-	fetchLECertAttempts  = &expvar.Int{}
-	storeSecretAttempts  = &expvar.Int{}
-	loadConfigAttempts   = &expvar.Int{}
-	fetchSecretErrors    = &expvar.Int{}
-	fetchLECertErrors    = &expvar.Int{}
-	storeSecretErrors    = &expvar.Int{}
-	loadConfigErrors     = &expvar.Int{}
-	fetchSecretSuccesses = &expvar.Int{}
-	fetchLECertSuccesses = &expvar.Int{}
-	storeSecretSuccesses = &expvar.Int{}
-	loadConfigSuccesses  = &expvar.Int{}
-	storeSecretCreates   = &expvar.Int{}
-	storeSecretUpdates   = &expvar.Int{}
-	runCount             = &expvar.Int{}
-	errorCount           = &expvar.Int{}
-	fetchSecretMetrics   = (&expvar.Map{}).Init()
-	fetchLECertMetrics   = (&expvar.Map{}).Init()
-	storeSecretMetrics   = (&expvar.Map{}).Init()
-	loadConfigMetrics    = (&expvar.Map{}).Init()
-	stageMetrics         = expvar.NewMap("stages")
-	buildSHA             = "<debug>"
+	fetchLECertPrefix    = "stages/fetch-cert/"
+	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.")
+	fetchLECertErrors    = stats.Int64(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.")
+	fetchLECertSuccesses = stats.Int64(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.")
+
+	fetchSecretPrefix    = "stages/fetch-secret/"
+	fetchSecretAttempts  = stats.Int64(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.")
+	fetchSecretErrors    = stats.Int64(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.")
+	fetchSecretSuccesses = stats.Int64(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.")
+
+	storeSecretPrefix    = "stages/store-secret/"
+	storeSecretAttempts  = stats.Int64(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.")
+	storeSecretErrors    = stats.Int64(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.")
+	storeSecretSuccesses = stats.Int64(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.")
+	storeSecretUpdates   = stats.Int64(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.")
+	storeSecretCreates   = stats.Int64(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.")
+
+	loadConfigPrefix    = "stages/load-config/"
+	loadConfigAttempts  = stats.Int64(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.")
+	loadConfigErrors    = stats.Int64(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.")
+	loadConfigSuccesses = stats.Int64(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.")
+
+	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.")
+	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.")
+	buildSHA   = "<debug>"
 )
 
 func main() {
@@ -67,36 +73,32 @@ func main() {
 		os.Exit(2)
 	}
 
+	view.SetReportingPeriod(1 * time.Minute)
+	if metadata.OnGCE() {
+		// We don't want to load these checks because we want the dev
+		// environment to work quietly and not crash. Plus, the errors
+		// FindDefaultCredentials returns are undocumented and unexported in its
+		// API.
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		creds, err := google.FindDefaultCredentials(ctx)
+		if err != nil {
+			fmt.Errorf("unable to find default Google credentials for tracing and metrics: %s", err)
+		}
+
+		exporter, err := stackdriver.NewExporter(stackdriver.Options{
+			ProjectID: creds.ProjectID,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to create Stackdriver opencensus exporter: %s", err)
+		}
+		view.RegisterExporter(exporter)
+	}
+
 	cLoader, conf, err := newConfLoader(*confPath)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}
-
-	fetchSecretMetrics.Set("attempts", fetchSecretAttempts)
-	fetchLECertMetrics.Set("attempts", fetchLECertAttempts)
-	storeSecretMetrics.Set("attempts", storeSecretAttempts)
-	loadConfigMetrics.Set("attempts", cLoader.attempts)
-
-	fetchSecretMetrics.Set("errors", fetchSecretErrors)
-	fetchLECertMetrics.Set("errors", fetchLECertErrors)
-	storeSecretMetrics.Set("errors", storeSecretErrors)
-	loadConfigMetrics.Set("errors", loadConfigErrors)
-
-	fetchSecretMetrics.Set("successes", fetchSecretSuccesses)
-	fetchLECertMetrics.Set("successes", fetchLECertSuccesses)
-	storeSecretMetrics.Set("successes", storeSecretSuccesses)
-	loadConfigMetrics.Set("successes", cLoader.successes)
-
-	storeSecretMetrics.Set("secret_updates", storeSecretUpdates)
-	storeSecretMetrics.Set("secret_creates", storeSecretCreates)
-
-	stageMetrics.Set("fetch_secret", fetchSecretMetrics)
-	stageMetrics.Set("fetch_le_cert", fetchLECertMetrics)
-	stageMetrics.Set("store_secret", storeSecretMetrics)
-	stageMetrics.Set("load_config", loadConfigMetrics)
-
-	stageMetrics.Set("runs", runCount)
-	stageMetrics.Set("errors", errorCount)
 
 	loadConfigMetrics.Set("last_config_check", cLoader.lastCheck)
 	loadConfigMetrics.Set("last_config_check_str", unixTime{unixEpoch: cLoader.lastCheck})
