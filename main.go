@@ -127,6 +127,9 @@ func main() {
 					"container_name": os.Getenv("K8S_CONTAINER"),
 				},
 			},
+			OnError: func(err error) {
+				log.Printf("stackdriver exporter saw error: %s", err)
+			},
 		})
 		if err != nil {
 			log.Fatalf("unable to create Stackdriver opencensus exporter: %s", err)
