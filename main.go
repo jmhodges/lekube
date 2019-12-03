@@ -305,7 +305,7 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client c
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
 	defer cancel()
 
-	fetchLECertAttempts.M(1)
+	stats.Record(ctx, fetchLECertAttempts.M(1))
 	acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
 		recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
@@ -316,20 +316,20 @@ func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client c
 		recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 		return
 	}
-	fetchLECertSuccesses.M(1)
+	stats.Record(ctx, fetchLECertSuccesses.M(1))
 	log.Printf("have new cert for %s", secConf.FullName())
 	var oldSec *kubeapi.Secret
 	if tlsSec != nil {
 		oldSec = tlsSec.Secret
 	}
 
-	storeSecretAttempts.M(1)
-	err = storeK8SSecret(client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
+	stats.Record(ctx, storeSecretAttempts.M(1))
+	err = storeK8SSecret(ctx, client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
 	if err != nil {
 		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return
 	}
-	storeSecretSuccesses.M(1)
+	stats.Record(ctx, storeSecretSuccesses.M(1))
 	log.Printf("successfully stored new cert in %s", secConf.FullName())
 }
 
@@ -372,7 +372,7 @@ func fetchK8SSecret(client corev1.SecretInterface, secretName string) (*tlsSecre
 	return tlsSec, nil
 }
 
-func storeK8SSecret(cl corev1.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
+func storeK8SSecret(ctx context.Context, cl corev1.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
 	f := cl.Update
 	sec := oldSec
 	if oldSec == nil {
@@ -383,9 +383,9 @@ func storeK8SSecret(cl corev1.SecretInterface, secConf *secretConf, oldSec *kube
 			},
 			Data: make(map[string][]byte),
 		}
-		storeSecretCreates.M(1)
+		stats.Record(ctx, storeSecretCreates.M(1))
 	} else {
-		storeSecretUpdates.M(1)
+		stats.Record(ctx, storeSecretUpdates.M(1))
 	}
 
 	sec.Data["tls.crt"] = leCert.Cert
@@ -421,8 +421,12 @@ var stageErrors = map[stage]*stats.Int64Measure{
 }
 
 func recordError(st stage, format string, args ...interface{}) {
-	errorCount.M(1)
-	stageErrors[st].M(1)
+	// Any context we pass in here might have already expired, so we create a
+	// new one just for the stats.
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	stats.Record(ctx, errorCount.M(1))
+	stats.Record(ctx, stageErrors[st].M(1))
 	log.Printf(format, args...)
 }
 
