@@ -105,14 +105,23 @@ func main() {
 		if err != nil {
 			log.Fatalf("unable to get Zone from GCE metadata: %s", err)
 		}
+		location, err := metadata.InstanceAttributeValue("cluster-location")
+		if err != nil {
+			log.Fatalf("unable to get cluster-location InstanceAttributeValue from GCE metadata")
+		}
+		clusterName, err := metadata.InstanceAttributeValue("cluster-name")
+		if err != nil {
+			log.Fatalf("unable to get cluster-name InstanceAttributeValue from GCE emetadata")
+		}
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID: creds.ProjectID,
 			Resource: &monitoredres.MonitoredResource{
 				Type: "k8s_container",
 				Labels: map[string]string{
 					"project_id":     projID,
-					"location":       zone,
-					"cluster_name":   os.Getenv("K8S_CLUSTER"),
+					"location":       location,
+					"zone":           zone,
+					"cluster_name":   clusterName,
 					"namespace_name": os.Getenv("K8S_NAMESPACE"),
 					"pod_name":       os.Getenv("K8S_POD"),
 					"container_name": os.Getenv("K8S_CONTAINER"),
