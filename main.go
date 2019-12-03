@@ -117,7 +117,7 @@ func main() {
 			ProjectID:    creds.ProjectID,
 			MetricPrefix: "lekube",
 			Resource: &monitoredres.MonitoredResource{
-				Type: "k8s_container",
+				Type: "k8s_pod",
 				Labels: map[string]string{
 					"project_id":     projID,
 					"location":       location,
