@@ -25,6 +25,7 @@ import (
 	"go.opencensus.io/stats/view"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/time/rate"
+	"google.golang.org/genproto/googleapis/api/monitoredres"
 	kubeapi "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,33 +40,33 @@ var (
 	httpsAddr    = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
 	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
-	fetchLECertPrefix    = "stages/fetch-cert/"
+	fetchLECertPrefix    = "lekube/stages/fetch-cert/"
 	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
 	fetchLECertErrors    = stats.Int64(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
 	fetchLECertSuccesses = stats.Int64(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
 
-	fetchSecretPrefix    = "stages/fetch-secret/"
+	fetchSecretPrefix    = "lekube/stages/fetch-secret/"
 	fetchSecretAttempts  = stats.Int64(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.", stats.UnitDimensionless)
 	fetchSecretErrors    = stats.Int64(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.", stats.UnitDimensionless)
 	fetchSecretSuccesses = stats.Int64(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.", stats.UnitDimensionless)
 
-	storeSecretPrefix    = "stages/store-secret/"
+	storeSecretPrefix    = "lekube/stages/store-secret/"
 	storeSecretAttempts  = stats.Int64(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.", stats.UnitDimensionless)
 	storeSecretErrors    = stats.Int64(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.", stats.UnitDimensionless)
 	storeSecretSuccesses = stats.Int64(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.", stats.UnitDimensionless)
 	storeSecretUpdates   = stats.Int64(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.", stats.UnitDimensionless)
 	storeSecretCreates   = stats.Int64(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.", stats.UnitDimensionless)
 
-	loadConfigPrefix    = "stages/load-config/"
+	loadConfigPrefix    = "lekube/stages/load-config/"
 	loadConfigAttempts  = stats.Int64(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.", stats.UnitDimensionless)
 	loadConfigErrors    = stats.Int64(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.", stats.UnitDimensionless)
 	loadConfigSuccesses = stats.Int64(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.", stats.UnitDimensionless)
 
-	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.", stats.UnitDimensionless)
-	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.", stats.UnitDimensionless)
+	runCount   = stats.Int64("lekube/runs", "The number of top-level runs lekube has made.", stats.UnitDimensionless)
+	errorCount = stats.Int64("lekube/errors", "The number of top-level runs lekube has seen.", stats.UnitDimensionless)
 
-	lastCheck  = stats.Int64("last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
-	lastChange = stats.Int64("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
+	lastCheck  = stats.Int64("lekube/last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
+	lastChange = stats.Int64("lekube/last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
 
 	buildSHA = "<debug>"
 )
@@ -96,9 +97,26 @@ func main() {
 		if err != nil {
 			fmt.Errorf("unable to find default Google credentials for tracing and metrics: %s", err)
 		}
-
+		projID, err := metadata.ProjectID()
+		if err != nil {
+			log.Fatalf("unable to get ProjectID from GCE metadata: %s", err)
+		}
+		zone, err := metadata.Zone()
+		if err != nil {
+			log.Fatalf("unable to get Zone from GCE metadata: %s", err)
+		}
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID: creds.ProjectID,
+			Resource: &monitoredres.MonitoredResource{
+				Type: "k8s_container",
+				Labels: map[string]string{
+					"project_id":     projID,
+					"location":       zone,
+					"namespace_name": os.Getenv("K8S_NAMESPACE"),
+					"pod_name":       os.Getenv("K8S_POD"),
+					"container_name": os.Getenv("K8S_CONTAINER"),
+				},
+			},
 		})
 		if err != nil {
 			log.Fatalf("unable to create Stackdriver opencensus exporter: %s", err)
