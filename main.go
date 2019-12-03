@@ -113,19 +113,24 @@ func main() {
 		if err != nil {
 			log.Fatalf("unable to get cluster-name InstanceAttributeValue from GCE emetadata")
 		}
+		instanceID, err := metadata.InstanceID()
+		if err != nil {
+			log.Fatalf("unable to get InstanceID from GCE metadata")
+		}
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID:    creds.ProjectID,
 			MetricPrefix: "lekube",
 			Resource: &monitoredres.MonitoredResource{
-				Type: "k8s_container",
+				Type: "gke_container",
 				Labels: map[string]string{
 					"project_id":     projID,
 					"location":       location,
 					"zone":           zone,
 					"cluster_name":   clusterName,
-					"namespace_name": os.Getenv("K8S_NAMESPACE"),
-					"pod_name":       os.Getenv("K8S_POD"),
+					"namespace_id":   os.Getenv("K8S_NAMESPACE"),
+					"pod_id":         os.Getenv("K8S_POD"),
 					"container_name": os.Getenv("K8S_CONTAINER"),
+					"instance_id":    instanceID,
 				},
 			},
 			OnError: func(err error) {
