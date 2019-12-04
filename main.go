@@ -251,19 +251,21 @@ func main() {
 }
 
 func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
-	stats.Record(runCount.M(1))
+	ctx, cancel := context.WithTimeout(context.Background(), leTimeout+20*time.Second)
+	defer cancel()
+	stats.Record(ctx, runCount.M(1))
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		stats.Record(fetchSecretAttempts.M(1))
+		stats.Record(ctx, fetchSecretAttempts.M(1))
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
-		stats.Record(fetchSecretSuccesses.M(1))
+		stats.Record(ctx, fetchSecretSuccesses.M(1))
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
 
 		tlsSecs[secConf.FullName()] = tlsSec
@@ -290,17 +292,14 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 
 		if refreshCert {
 			log.Printf("working on %s", secConf.FullName())
-			workOn(tlsSec, secConf, lcm, client, conf, leTimeout)
+			workOn(ctx, tlsSec, secConf, lcm, client, conf, leTimeout)
 		} else {
 			log.Printf("no work needed for secret %s", secConf.FullName())
 		}
 	}
 }
 
-func workOn(tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), leTimeout)
-	defer cancel()
-
+func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
 	stats.Record(ctx, fetchLECertAttempts.M(1))
 	acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
