@@ -146,6 +146,8 @@ func main() {
 		loadConfigAttempts,
 		loadConfigErrors,
 		loadConfigSuccesses,
+		runCount,
+		errorCount,
 	)
 
 	statViews = append(statViews, latestViews(lastCheck, lastChange)...)
