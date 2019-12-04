@@ -102,10 +102,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("unable to get ProjectID from GCE metadata: %s", err)
 		}
-		zone, err := metadata.Zone()
-		if err != nil {
-			log.Fatalf("unable to get Zone from GCE metadata: %s", err)
-		}
 		location, err := metadata.InstanceAttributeValue("cluster-location")
 		if err != nil {
 			log.Fatalf("unable to get cluster-location InstanceAttributeValue from GCE metadata")
