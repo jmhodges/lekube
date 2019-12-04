@@ -421,8 +421,7 @@ func recordError(st stage, format string, args ...interface{}) {
 	// new one just for the stats.
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	stats.Record(ctx, errorCount.M(1))
-	stats.Record(ctx, stageErrors[st].M(1))
+	stats.Record(ctx, errorCount.M(1), stageErrors[st].M(1))
 	log.Printf(format, args...)
 }
 
