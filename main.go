@@ -82,16 +82,8 @@ func main() {
 	usePrintTracer := os.Getenv("USE_PRINT_EXPORTER") != ""
 	log.Println("USE_PRINT_EXPORTER is", usePrintTracer)
 	if usePrintTracer {
-		exporter, err := exporter.NewLogExporter(exporter.Options{
-			MetricsLogFile:    "/dev/stderr",
-			ReportingInterval: 1 * time.Second,
-		})
-		if err != nil {
-			log.Fatalf("unable to create LogExporter: %s", err)
-		}
-		exporter.Start()
-		defer exporter.Stop()
-		defer exporter.Close()
+		exporter := &exporter.PrintExporter{}
+		view.RegisterExporter(exporter)
 	}
 
 	view.SetReportingPeriod(1 * time.Minute)
