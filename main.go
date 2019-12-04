@@ -80,6 +80,7 @@ func main() {
 	}
 
 	usePrintTracer := os.Getenv("USE_PRINT_EXPORTER") != ""
+	log.Println("USE_PRINT_EXPORTER is", usePrintTracer)
 	if usePrintTracer {
 		exporter := &exporter.PrintExporter{}
 		view.RegisterExporter(exporter)
