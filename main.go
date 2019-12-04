@@ -259,19 +259,19 @@ func main() {
 }
 
 func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
-	runCount.M(1)
+	stats.Record(runCount.M(1))
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		fetchSecretAttempts.M(1)
+		stats.Record(fetchSecretAttempts.M(1))
 		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
-		fetchSecretSuccesses.M(1)
+		stats.Record(fetchSecretSuccesses.M(1))
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
 
 		tlsSecs[secConf.FullName()] = tlsSec
