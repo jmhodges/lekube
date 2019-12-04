@@ -122,7 +122,6 @@ func main() {
 				Labels: map[string]string{
 					"project_id":     projID,
 					"location":       location,
-					"zone":           zone,
 					"cluster_name":   clusterName,
 					"namespace_name": os.Getenv("K8S_NAMESPACE"),
 					"pod_name":       os.Getenv("K8S_POD"),
