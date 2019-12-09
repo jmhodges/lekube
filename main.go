@@ -154,6 +154,8 @@ func main() {
 	if err := view.Register(statViews...); err != nil {
 		log.Fatalf("unable to register the opencensus stat views: %s", err)
 	}
+	// FIXME for adding to the alerts
+	stats.Record(errorCount.M(1))
 	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
