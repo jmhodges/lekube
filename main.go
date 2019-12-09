@@ -111,8 +111,7 @@ func main() {
 			log.Fatalf("unable to get cluster-name InstanceAttributeValue from GCE emetadata")
 		}
 		exporter, err := stackdriver.NewExporter(stackdriver.Options{
-			ProjectID:    creds.ProjectID,
-			MetricPrefix: "lekube",
+			ProjectID: creds.ProjectID,
 			Resource: &monitoredres.MonitoredResource{
 				Type: "k8s_container",
 				Labels: map[string]string{
@@ -459,7 +458,7 @@ func countViews(measures ...*stats.Int64Measure) []*view.View {
 	out := make([]*view.View, len(measures))
 	for i, m := range measures {
 		out[i] = &view.View{
-			Name:        m.Name(),
+			Name:        "lekube/" + m.Name(),
 			Description: m.Description(),
 			Measure:     m,
 			Aggregation: view.Count(),
@@ -472,7 +471,7 @@ func latestViews(measures ...*stats.Int64Measure) []*view.View {
 	out := make([]*view.View, len(measures))
 	for i, m := range measures {
 		out[i] = &view.View{
-			Name:        m.Name(),
+			Name:        "lekube/" + m.Name(),
 			Description: m.Description(),
 			Measure:     m,
 			Aggregation: view.LastValue(),
