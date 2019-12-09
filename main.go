@@ -156,7 +156,7 @@ func main() {
 	}
 	// FIXME for adding to the alerts
 	ctx2 := context.Background()
-	stats.Record(errorCount.M(ctx2, 1))
+	stats.Record(ctx2, errorCount.M(1))
 	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
