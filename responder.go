@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	jose "gopkg.in/square/go-jose.v1"
+	jose "gopkg.in/square/go-jose.v2"
 )
 
 type leResponder struct {
@@ -25,7 +25,7 @@ type responseInfo struct {
 }
 
 func newLEResponser(accountPubKey *rsa.PublicKey) (*leResponder, error) {
-	k := jose.JsonWebKey{Key: accountPubKey}
+	k := jose.JSONWebKey{Key: accountPubKey}
 	thumbprint, err := k.Thumbprint(crypto.SHA256)
 	if err != nil {
 		return nil, err
