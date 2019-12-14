@@ -13,5 +13,5 @@ require (
 	gopkg.in/square/go-jose.v1 v1.0.2
 	k8s.io/api v0.17.0
 	k8s.io/apimachinery v0.17.0
-	k8s.io/client-go v0.17.0
+	k8s.io/client-go/v12/v12 v12.0.0
 )
