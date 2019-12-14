@@ -218,7 +218,7 @@ google.golang.org/grpc/status
 google.golang.org/grpc/tap
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/square/go-jose.v1 v1.0.2
+# gopkg.in/square/go-jose.v1 v1.1.2
 gopkg.in/square/go-jose.v1
 gopkg.in/square/go-jose.v1/cipher
 gopkg.in/square/go-jose.v1/json
