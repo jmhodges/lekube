@@ -1,5 +1,3 @@
-// +build !std_json
-
 /*-
  * Copyright 2014 Square Inc.
  *
@@ -16,16 +14,14 @@
  * limitations under the License.
  */
 
+/*
+
+Package jose aims to provide an implementation of the Javascript Object Signing
+and Encryption set of standards. It implements encryption and signing based on
+the JSON Web Encryption and JSON Web Signature standards, with optional JSON
+Web Token support available in a sub-package. The library supports both the
+compact and full serialization formats, and has optional support for multiple
+recipients.
+
+*/
 package jose
-
-import (
-	"gopkg.in/square/go-jose.v1/json"
-)
-
-func MarshalJSON(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
-}
-
-func UnmarshalJSON(data []byte, v interface{}) error {
-	return json.Unmarshal(data, v)
-}
