@@ -4,7 +4,7 @@ cloud.google.com/go/container/apiv1
 cloud.google.com/go/internal/version
 cloud.google.com/go/monitoring/apiv3
 cloud.google.com/go/trace/apiv2
-# contrib.go.opencensus.io/exporter/stackdriver v0.12.9
+# contrib.go.opencensus.io/exporter/stackdriver v0.13.0
 contrib.go.opencensus.io/exporter/stackdriver
 contrib.go.opencensus.io/exporter/stackdriver/monitoredresource
 # github.com/aws/aws-sdk-go v1.23.20
