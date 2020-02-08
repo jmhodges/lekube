@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	cloud.google.com/go v0.52.0
-	contrib.go.opencensus.io/exporter/stackdriver v0.12.9
+	contrib.go.opencensus.io/exporter/stackdriver v0.13.0
 	go.opencensus.io v0.22.3
 	golang.org/x/crypto v0.0.0-20200128174031-69ecbb4d6d5d
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
