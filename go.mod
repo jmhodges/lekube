@@ -12,6 +12,6 @@ require (
 	google.golang.org/genproto v0.0.0-20200203223152-ff9e8190c2f5
 	gopkg.in/square/go-jose.v2 v2.4.1
 	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
+	k8s.io/apimachinery v0.17.3
 	k8s.io/client-go v0.17.2
 )
