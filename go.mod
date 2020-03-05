@@ -9,7 +9,7 @@ require (
 	golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/genproto v0.0.0-20200225123651-fc8f55426688
+	google.golang.org/genproto v0.0.0-20200305110556-506484158171
 	gopkg.in/square/go-jose.v2 v2.4.1
 	k8s.io/api v0.17.3
 	k8s.io/apimachinery v0.17.3
