@@ -3,7 +3,7 @@ module github.com/jmhodges/lekube
 go 1.13
 
 require (
-	cloud.google.com/go v0.54.0
+	cloud.google.com/go v0.55.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.0
 	go.opencensus.io v0.22.3
 	golang.org/x/crypto v0.0.0-20200302210943-78000ba7a073
