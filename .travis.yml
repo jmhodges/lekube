@@ -1,6 +1,6 @@
 language: go
 go:
-- 1.14
+- 1.14.1
 sudo: required
 services:
 - docker
@@ -10,6 +10,6 @@ branches:
   - /^test_/
   - /^test-/
 install:
-- go test -race -i .
+- go test -mod=vendor -race -i .
 script:
-- go test -race . && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.buildSHA=${TRAVIS_COMMIT}" . && ./travis_docker_push.sh
+- go test -mod=vendor -race . && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.buildSHA=${TRAVIS_COMMIT}" . && ./travis_docker_push.sh
