@@ -20,7 +20,7 @@ require (
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	gopkg.in/square/go-jose.v2 v2.4.1
 	k8s.io/api v0.17.4
-	k8s.io/apimachinery v0.17.4
+	k8s.io/apimachinery v0.22.1
 	k8s.io/client-go v0.17.4
 )
 
