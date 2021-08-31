@@ -256,7 +256,7 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		stats.Record(ctx, fetchSecretAttempts.M(1))
-		tlsSec, err := fetchK8SSecret(client.Secrets(*secConf.Namespace), secConf.Name)
+		tlsSec, err := fetchK8SSecret(ctx, client.Secrets(*secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
@@ -325,8 +325,8 @@ func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *le
 }
 
 // fetchK8SSecret may return a nil tlsSecret if no secret was found.
-func fetchK8SSecret(client corev1.SecretInterface, secretName string) (*tlsSecret, error) {
-	sec, err := client.Get(secretName, metav1.GetOptions{})
+func fetchK8SSecret(ctx context.Context, client corev1.SecretInterface, secretName string) (*tlsSecret, error) {
+	sec, err := client.Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			return nil, nil
@@ -364,24 +364,28 @@ func fetchK8SSecret(client corev1.SecretInterface, secretName string) (*tlsSecre
 }
 
 func storeK8SSecret(ctx context.Context, cl corev1.SecretInterface, secConf *secretConf, oldSec *kubeapi.Secret, leCert *newCert) error {
-	f := cl.Update
-	sec := oldSec
 	if oldSec == nil {
-		f = cl.Create
-		sec = &kubeapi.Secret{
+		sec := &kubeapi.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secConf.Name,
 			},
 			Data: make(map[string][]byte),
 		}
+		sec.Data["tls.crt"] = leCert.Cert
+		sec.Data["tls.key"] = leCert.Key
+
 		stats.Record(ctx, storeSecretCreates.M(1))
-	} else {
-		stats.Record(ctx, storeSecretUpdates.M(1))
+		_, err := cl.Create(ctx, sec, metav1.CreateOptions{})
+		return err
 	}
 
+	sec := oldSec.DeepCopy()
 	sec.Data["tls.crt"] = leCert.Cert
 	sec.Data["tls.key"] = leCert.Key
-	_, err := f(sec)
+
+	stats.Record(ctx, storeSecretUpdates.M(1))
+	_, err := cl.Update(ctx, sec, metav1.UpdateOptions{})
+
 	return err
 }
 
