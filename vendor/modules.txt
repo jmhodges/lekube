@@ -1,4 +1,4 @@
-# cloud.google.com/go v0.93.3
+# cloud.google.com/go v0.94.1
 ## explicit; go 1.11
 cloud.google.com/go/compute/metadata
 # cloud.google.com/go/monitoring v0.1.0
