@@ -3,7 +3,7 @@ module github.com/jmhodges/lekube
 go 1.17
 
 require (
-	cloud.google.com/go v0.95.0
+	cloud.google.com/go v0.97.0
 	cloud.google.com/go/monitoring v0.1.0 // indirect
 	cloud.google.com/go/trace v0.1.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.8
@@ -17,7 +17,7 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/api v0.57.0 // indirect
-	google.golang.org/genproto v0.0.0-20210921142501-181ce0d877f6
+	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0
 	gopkg.in/square/go-jose.v2 v2.4.1
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
