@@ -9,6 +9,6 @@ ADD . /go/src/github.com/jmhodges/lekube
 RUN go build -o /go/bin/lekube
 
 # Now copy it into our base image.
-FROM gcr.io/distroless/base-debian10@sha256:d8244d4756b5dc43f2c198bf4e37e6f8a017f13fdd7f6f64ec7ac7228d3b191e
+FROM gcr.io/distroless/base-debian10@sha256:d2ce069a83a6407e98c7e0844f4172565f439dab683157bf93b6de20c5b46155
 COPY --from=build /go/bin/lekube /
 CMD ["/lekube", "-conf", "/etc/lekube/lekube.json"]
