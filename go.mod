@@ -19,8 +19,8 @@ require (
 	google.golang.org/api v0.57.0 // indirect
 	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0
 	gopkg.in/square/go-jose.v2 v2.6.0
-	k8s.io/api v0.22.2
-	k8s.io/apimachinery v0.22.2
+	k8s.io/api v0.22.3
+	k8s.io/apimachinery v0.22.3
 	k8s.io/client-go v0.22.2
 )
 
