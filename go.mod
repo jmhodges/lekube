@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.40.33 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
+	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63 // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
