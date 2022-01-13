@@ -17,7 +17,7 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
 	google.golang.org/api v0.61.0 // indirect
-	google.golang.org/genproto v0.0.0-20211221231510-d629cc9a93d5
+	google.golang.org/genproto v0.0.0-20220112215332-a9c7c0acf9f2
 	gopkg.in/square/go-jose.v2 v2.6.0
 	k8s.io/api v0.23.1
 	k8s.io/apimachinery v0.23.1
