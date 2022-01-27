@@ -286,6 +286,7 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 			refreshCert = true
 		} else if isRevokedLetsEncrypt(tlsSec.Cert) {
 			log.Printf("Let's Encrypt revoked cert from their ALPN-01 bug in 2022-01")
+			refreshCert = true
 		}
 
 		if refreshCert {
