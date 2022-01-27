@@ -284,6 +284,8 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 		} else if domainMismatch(tlsSec.Cert, secConf.Domains) {
 			log.Printf("domain mismatch between cert and secret %s", secConf.FullName())
 			refreshCert = true
+		} else if isRevokedLetsEncrypt(tlsSec.Cert) {
+			log.Printf("Let's Encrypt revoked cert from their ALPN-01 bug in 2022-01")
 		}
 
 		if refreshCert {
@@ -479,4 +481,16 @@ func latestViews(measures ...*stats.Int64Measure) []*view.View {
 		}
 	}
 	return out
+}
+
+// https://community.letsencrypt.org/t/2022-01-25-issue-with-tls-alpn-01-validation-method/170450
+var letsEncryptFixDeployTime = time.Date(2022, time.January, 26, 00, 48, 0, 0, time.UTC)
+
+// isRevokedLetsEncrypt returns whether the certificate is likely to be part of
+// a batch of certificates revoked by Let's Encrypt in January 2022. This check
+// can be safely removed from May 2022.
+func isRevokedLetsEncrypt(cert *x509.Certificate) bool {
+	O := cert.Issuer.Organization
+	return len(O) == 1 && O[0] == "Let's Encrypt" &&
+		cert.NotBefore.Before(letsEncryptFixDeployTime)
 }
