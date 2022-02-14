@@ -1,5 +1,5 @@
-# cloud.google.com/go/compute v1.2.0
-## explicit; go 1.11
+# cloud.google.com/go/compute v1.3.0
+## explicit; go 1.15
 cloud.google.com/go/compute/metadata
 # cloud.google.com/go/monitoring v1.1.0
 ## explicit; go 1.16
@@ -164,7 +164,7 @@ golang.org/x/oauth2/jwt
 # golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 ## explicit
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+# golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
@@ -182,7 +182,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11
 ## explicit
 golang.org/x/time/rate
-# google.golang.org/api v0.66.0
+# google.golang.org/api v0.67.0
 ## explicit; go 1.11
 google.golang.org/api/googleapi
 google.golang.org/api/internal
@@ -209,7 +209,7 @@ google.golang.org/appengine/internal/socket
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/socket
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20220201184016-50beb8ab5c44
+# google.golang.org/genproto v0.0.0-20220207164111-0872dc986b00
 ## explicit; go 1.11
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
@@ -224,8 +224,8 @@ google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/googleapis/type/calendarperiod
-# google.golang.org/grpc v1.40.1
-## explicit; go 1.11
+# google.golang.org/grpc v1.44.0
+## explicit; go 1.14
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -247,6 +247,7 @@ google.golang.org/grpc/credentials/alts/internal/handshaker
 google.golang.org/grpc/credentials/alts/internal/handshaker/service
 google.golang.org/grpc/credentials/alts/internal/proto/grpc_gcp
 google.golang.org/grpc/credentials/google
+google.golang.org/grpc/credentials/insecure
 google.golang.org/grpc/credentials/oauth
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
