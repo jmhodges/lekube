@@ -22,6 +22,7 @@ jobs:
     name: Setup, Build, Publish, and Deploy
     runs-on: ubuntu-latest
     environment: production
+    concurrency: production-deploy
 
     steps:
       - name: Checkout
