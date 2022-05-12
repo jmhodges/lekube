@@ -1,7 +1,7 @@
 # Copyright 2021 Jeffrey M Hodges.
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.17-buster@sha256:be5a9452e6784587bba3d3ac5c2aa955ebd03a8c2aeea6a8cb31b7f4cfcba181 as build
+FROM golang:1.17-buster@sha256:a4b0cb14c2f18eb5fa85f3ca65d5087b886c6f6b51548257effdd9dd940c9105 as build
 
 WORKDIR /go/src/github.com/jmhodges/lekube
 ADD . /go/src/github.com/jmhodges/lekube
