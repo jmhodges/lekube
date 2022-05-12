@@ -7,7 +7,7 @@ cloud.google.com/go/monitoring/apiv3/v2
 # cloud.google.com/go/trace v1.0.0
 ## explicit; go 1.16
 cloud.google.com/go/trace/apiv2
-# contrib.go.opencensus.io/exporter/stackdriver v0.13.10
+# contrib.go.opencensus.io/exporter/stackdriver v0.13.12
 ## explicit; go 1.15
 contrib.go.opencensus.io/exporter/stackdriver
 contrib.go.opencensus.io/exporter/stackdriver/monitoredresource
@@ -114,6 +114,9 @@ github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.2
 ## explicit; go 1.12
 github.com/modern-go/reflect2
+# github.com/prometheus/prometheus v2.5.0+incompatible
+## explicit
+github.com/prometheus/prometheus/pkg/value
 # go.opencensus.io v0.23.0
 ## explicit; go 1.13
 go.opencensus.io
