@@ -9,10 +9,10 @@ require (
 	github.com/aws/aws-sdk-go v1.40.33 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	go.opencensus.io v0.23.0
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
-	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/api v0.84.0 // indirect
@@ -20,7 +20,7 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 	k8s.io/api v0.25.3
 	k8s.io/apimachinery v0.25.3
-	k8s.io/client-go v0.24.3
+	k8s.io/client-go v0.25.3
 )
 
 require cloud.google.com/go/compute v1.7.0
