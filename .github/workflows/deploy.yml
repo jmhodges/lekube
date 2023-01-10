@@ -74,7 +74,7 @@ jobs:
         id: image
         run: |-
           FULLIMAGE=$(docker inspect --format='{{index .RepoDigests 0}}' gcr.io/${{ steps.auth.outputs.project_id }}/$IMAGE:$GITHUB_SHA);
-          echo "::set-output name=fullimage::${FULLIMAGE}"
+          echo "fullimage=${FULLIMAGE}" >> $GITHUB_OUTPUT
       - name: Update GKE deployment
         run: |-
           kubectl -n prod set image deployment/$DEPLOYMENT_NAME $IMAGE="${{ steps.image.outputs.fullimage }}"
