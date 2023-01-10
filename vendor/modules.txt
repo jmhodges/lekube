@@ -154,7 +154,7 @@ github.com/munnerz/goautoneg
 # github.com/prometheus/prometheus v2.5.0+incompatible
 ## explicit
 github.com/prometheus/prometheus/pkg/value
-# go.opencensus.io v0.23.0
+# go.opencensus.io v0.24.0
 ## explicit; go 1.13
 go.opencensus.io
 go.opencensus.io/examples/exporter
