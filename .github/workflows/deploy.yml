@@ -46,7 +46,7 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_ZONE }}
 
-      - uses: google-github-actions/setup-gcloud@v1.0.1
+      - uses: google-github-actions/setup-gcloud@v1.1.0
 
       # Configure Docker to use the gcloud command-line tool as a credential
       # helper for authentication
