@@ -35,13 +35,13 @@ jobs:
           go test -race ./...
 
       # Setup gcloud CLI
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v1'
+      - id: "auth"
+        uses: "google-github-actions/auth@v1"
         with:
-          credentials_json: '${{ secrets.GKE_SA_KEY }}'
+          credentials_json: "${{ secrets.GKE_SA_KEY }}"
 
-      - id: 'get-credentials'
-        uses: 'google-github-actions/get-gke-credentials@v1'
+      - id: "get-credentials"
+        uses: "google-github-actions/get-gke-credentials@v1"
         with:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_ZONE }}
@@ -78,4 +78,4 @@ jobs:
       - name: Update GKE deployment
         run: |-
           kubectl -n prod set image deployment/$DEPLOYMENT_NAME $IMAGE="${{ steps.image.outputs.fullimage }}"
-          kubectl -n prod rollout status deployment/$DEPLOYMENT_NAME
+          kubectl -n prod rollout status --timeout=5m deployment/$DEPLOYMENT_NAME
