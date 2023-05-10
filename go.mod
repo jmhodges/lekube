@@ -5,8 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go/monitoring v1.13.1 // indirect
 	cloud.google.com/go/trace v1.9.0 // indirect
-	contrib.go.opencensus.io/exporter/stackdriver v0.13.12
-	github.com/aws/aws-sdk-go v1.40.33 // indirect
+	github.com/aws/aws-sdk-go v1.43.31 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.9.0
@@ -23,7 +22,10 @@ require (
 	k8s.io/client-go v0.26.0
 )
 
-require cloud.google.com/go/compute/metadata v0.2.3
+require (
+	cloud.google.com/go/compute/metadata v0.2.3
+	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
+)
 
 require (
 	cloud.google.com/go/compute v1.19.0 // indirect
@@ -50,7 +52,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/prometheus/prometheus v2.5.0+incompatible // indirect
+	github.com/prometheus/prometheus v0.35.0 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/term v0.8.0 // indirect
