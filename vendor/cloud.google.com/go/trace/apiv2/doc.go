@@ -21,7 +21,12 @@
 // is collected for all App Engine applications by default. Trace data from
 // other applications can be provided using this API. This library is used to
 // interact with the Trace API directly. If you are looking to instrument
-// your application for Stackdriver Trace, we recommend using OpenCensus.
+// your application for Stackdriver Trace, we recommend using OpenTelemetry.
+//
+// # General documentation
+//
+// For information about setting deadlines, reusing contexts, and more
+// please visit https://pkg.go.dev/cloud.google.com/go.
 //
 // # Example usage
 //
@@ -75,9 +80,6 @@
 // Individual methods on the client use the ctx given to them.
 //
 // To close the open connection, use the Close() method.
-//
-// For information about setting deadlines, reusing contexts, and more
-// please visit https://pkg.go.dev/cloud.google.com/go.
 package trace // import "cloud.google.com/go/trace/apiv2"
 
 import (
