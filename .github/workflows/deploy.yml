@@ -60,7 +60,7 @@ jobs:
         run: echo "found as ${{steps.sha256-of-docker-image.outputs.IMAGE_WITH_SHA256}}"
 
       - id: update-deploy
-        run: kubectl -n prod set image deployment/howsmyssl $IMAGE=${{ steps.sha256-of-docker-image.outputs.IMAGE_WITH_SHA256 }}
+        run: kubectl -n prod set image "deployment/${DEPLOYMENT_NAME}" $IMAGE=${{ steps.sha256-of-docker-image.outputs.IMAGE_WITH_SHA256 }}
 
       - id: rollout-status
-        run: kubectl -n prod rollout status -timeout=5m deployments/${{ env.DEPLOYMENT_NAME }}
+        run: kubectl -n prod rollout status -timeout=5m "deployments/${DEPLOYMENT_NAME}"
