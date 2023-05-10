@@ -1,6 +1,6 @@
 module github.com/jmhodges/lekube
 
-go 1.17
+go 1.20
 
 require (
 	cloud.google.com/go/monitoring v1.8.0 // indirect
