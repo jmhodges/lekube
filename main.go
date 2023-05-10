@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -96,7 +95,7 @@ func main() {
 		defer cancel()
 		creds, err := google.FindDefaultCredentials(ctx)
 		if err != nil {
-			fmt.Errorf("unable to find default Google credentials for tracing and metrics: %s", err)
+			log.Fatalf("unable to find default Google credentials for tracing and metrics: %s", err)
 		}
 		projID, err := metadata.ProjectID()
 		if err != nil {
