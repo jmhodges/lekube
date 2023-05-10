@@ -10,6 +10,10 @@ on:
 
 concurrency: production
 
+permissions:
+  id-token: write # For Google OIDC workload identity things
+  contents: read
+
 env:
   GKE_CLUSTER: dg
   GKE_ZONE: us-central1-c
