@@ -27,55 +27,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v4
+      - id: auth
+        uses: google-github-actions/auth@v1.1.0
         with:
-          go-version: "1.18.2"
-      - name: Test
-        run: |-
-          go test -race ./...
+          workload_identity_provider: "projects/852340051888/locations/global/workloadIdentityPools/github-deploy/providers/github-deploy"
+          service_account: "lekube-deploy@personal-sites-1295.iam.gserviceaccount.com"
+          create_credentials_file: true
 
-      # Setup gcloud CLI
-      - id: "auth"
-        uses: "google-github-actions/auth@v1"
+      - id: get-gke-credentials
+        uses: google-github-actions/get-gke-credentials@v1.0.1
         with:
-          credentials_json: "${{ secrets.GKE_SA_KEY }}"
+          cluster_name: dg
+          location: us-central1-c
 
-      - id: "get-credentials"
-        uses: "google-github-actions/get-gke-credentials@v1"
-        with:
-          cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
+      - id: gcloud-config-docker
+        run: gcloud auth configure-docker -q us-central1-docker.pkg.dev
 
-      - uses: google-github-actions/setup-gcloud@v1.1.0
+      - id: docker-build
+        run: docker build -t us-central1-docker.pkg.dev/personal-sites-1295/deploys/lekube:v1-${GITHUB_SHA} .
 
-      # Configure Docker to use the gcloud command-line tool as a credential
-      # helper for authentication
-      - run: |-
-          gcloud --quiet auth configure-docker gcr.io
+      - id: docker-push
+        run: docker push us-central1-docker.pkg.dev/personal-sites-1295/deploys/lekube:v1-${GITHUB_SHA}
 
-      # Build the Docker image
-      - name: Build
-        run: |-
-          docker build \
-            --tag "us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA}" \
-            --build-arg GITHUB_SHA="$GITHUB_SHA" \
-            --build-arg GITHUB_REF="$GITHUB_REF" \
-            .
+      - id: sha256-of-docker-image
+        run: echo "IMAGE_WITH_SHA256=$(docker inspect --format='{{index .RepoDigests 0}}' us-central1-docker.pkg.dev/personal-sites-1295/deploys/lekube:v1-${GITHUB_SHA})" >> "$GITHUB_OUTPUT"
 
-      # Push the Docker image to Google Container Registry
-      - name: Publish
-        run: |-
-          docker push "us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA}"
+      - id: check-output
+        run: echo "found as ${{steps.sha256-of-docker-image.outputs.IMAGE_WITH_SHA256}}"
 
-      # Grab the image's SHA256 so we can use it instead of a tag (that can be
-      # modified underneath us). This has to be done after the image has been
-      # pushed. https://stackoverflow.com/questions/39811230/why-doesnt-my-newly-created-docker-have-a-digest
-      - name: Capture Docker image's SHA256
-        id: image
-        run: |-
-          FULLIMAGE=$(docker inspect --format='{{index .RepoDigests 0}}'  us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA});
-          echo "fullimage=${FULLIMAGE}" >> $GITHUB_OUTPUT
-      - name: Update GKE deployment
-        run: |-
-          kubectl -n prod set image deployment/$DEPLOYMENT_NAME $IMAGE="${{ steps.image.outputs.fullimage }}"
-          kubectl -n prod rollout status --timeout=5m deployment/$DEPLOYMENT_NAME
+      - id: update-deploy
+        run: kubectl -n prod set image deployment/howsmyssl $IMAGE=${{ steps.sha256-of-docker-image.outputs.IMAGE_WITH_SHA256 }}
+
+      - id: rollout-status
+        run: kubectl -n prod rollout status -timeout=5m deployments/${{ env.DEPLOYMENT_NAME }}
