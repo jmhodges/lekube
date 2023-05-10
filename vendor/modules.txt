@@ -14,13 +14,13 @@ cloud.google.com/go/monitoring/internal
 cloud.google.com/go/trace/apiv2
 cloud.google.com/go/trace/apiv2/tracepb
 cloud.google.com/go/trace/internal
-# contrib.go.opencensus.io/exporter/stackdriver v0.13.12
-## explicit; go 1.15
+# contrib.go.opencensus.io/exporter/stackdriver v0.13.14
+## explicit; go 1.17
 contrib.go.opencensus.io/exporter/stackdriver
 contrib.go.opencensus.io/exporter/stackdriver/monitoredresource
 contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/aws
 contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp
-# github.com/aws/aws-sdk-go v1.40.33
+# github.com/aws/aws-sdk-go v1.43.31
 ## explicit; go 1.11
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -178,9 +178,9 @@ github.com/modern-go/reflect2
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/prometheus/prometheus v2.5.0+incompatible
-## explicit
-github.com/prometheus/prometheus/pkg/value
+# github.com/prometheus/prometheus v0.35.0
+## explicit; go 1.16
+github.com/prometheus/prometheus/model/value
 # github.com/rogpeppe/go-internal v1.10.0
 ## explicit; go 1.19
 # go.opencensus.io v0.24.0
