@@ -14,7 +14,7 @@ require (
 	golang.org/x/oauth2 v0.8.0
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
+	golang.org/x/time v0.3.0
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd
 	gopkg.in/square/go-jose.v2 v2.6.0
