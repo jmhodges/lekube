@@ -57,7 +57,7 @@ jobs:
       - name: Build
         run: |-
           docker build \
-            --tag "gcr.io/${{ steps.auth.outputs.project_id }}/$IMAGE:$GITHUB_SHA" \
+            --tag "us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA}" \
             --build-arg GITHUB_SHA="$GITHUB_SHA" \
             --build-arg GITHUB_REF="$GITHUB_REF" \
             .
@@ -65,7 +65,7 @@ jobs:
       # Push the Docker image to Google Container Registry
       - name: Publish
         run: |-
-          docker push "gcr.io/${{ steps.auth.outputs.project_id }}/$IMAGE:$GITHUB_SHA"
+          docker push "us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA}"
 
       # Grab the image's SHA256 so we can use it instead of a tag (that can be
       # modified underneath us). This has to be done after the image has been
@@ -73,7 +73,7 @@ jobs:
       - name: Capture Docker image's SHA256
         id: image
         run: |-
-          FULLIMAGE=$(docker inspect --format='{{index .RepoDigests 0}}' gcr.io/${{ steps.auth.outputs.project_id }}/$IMAGE:$GITHUB_SHA);
+          FULLIMAGE=$(docker inspect --format='{{index .RepoDigests 0}}'  us-central1-docker.pkg.dev/${{ steps.auth.outputs.project_id }}/deploys/lekube:v1-${GITHUB_SHA});
           echo "fullimage=${FULLIMAGE}" >> $GITHUB_OUTPUT
       - name: Update GKE deployment
         run: |-
