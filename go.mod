@@ -18,7 +18,7 @@ require (
 
 require (
 	cloud.google.com/go/compute v1.19.2 // indirect
-	cloud.google.com/go/monitoring v1.13.1 // indirect
+	cloud.google.com/go/monitoring v1.14.0 // indirect
 	cloud.google.com/go/trace v1.9.1 // indirect
 	github.com/aws/aws-sdk-go v1.43.31 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
