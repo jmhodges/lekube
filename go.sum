@@ -6,8 +6,8 @@ cloud.google.com/go/compute/metadata v0.2.3 h1:mg4jlk7mCAj6xXp9UJ4fjI9VUI5rubuGB
 cloud.google.com/go/compute/metadata v0.2.3/go.mod h1:VAV5nSsACxMJvgaAuX6Pk2AawlZn8kiOGuCv6gTkwuA=
 cloud.google.com/go/monitoring v1.14.0 h1:duMLMV61WSPUSC93WIocFQMG7P7Byjmo73oLDO++Srs=
 cloud.google.com/go/monitoring v1.14.0/go.mod h1:YmMmLn+dX5qvhdXDHYaxUAwxtkY9qona6cL9fc7R8kY=
-cloud.google.com/go/trace v1.9.1 h1:M0GG0bmUnmBLuBbb2pH25/XIqBW3SeU7zQbDHraZYRc=
-cloud.google.com/go/trace v1.9.1/go.mod h1:4gPsg846XPp7AEppF36+JYwzUm2YKUxg0ltXDY4X2vs=
+cloud.google.com/go/trace v1.10.0 h1:qHz42GfGe3OfNvKMUs5Z8lD+PuUr3uqUADVgKG+SCw4=
+cloud.google.com/go/trace v1.10.0/go.mod h1:X3g0Th7+AIjj4rUVhv9JpMv7jpsRIJ9et+wYjCHYbQs=
 contrib.go.opencensus.io/exporter/stackdriver v0.13.14 h1:zBakwHardp9Jcb8sQHcHpXy/0+JIb1M8KjigCJzx7+4=
 contrib.go.opencensus.io/exporter/stackdriver v0.13.14/go.mod h1:5pSSGY0Bhuk7waTHuDf4aQ8D2DrhgETRo9fy6k3Xlzc=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
