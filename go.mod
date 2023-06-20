@@ -8,7 +8,7 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.0
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.10.0
-	golang.org/x/oauth2 v0.8.0
+	golang.org/x/oauth2 v0.9.0
 	golang.org/x/time v0.3.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc
 	k8s.io/api v0.27.2
