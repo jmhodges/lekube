@@ -286,6 +286,9 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 		} else if isRevokedLetsEncrypt(tlsSec.Cert) {
 			log.Printf("Let's Encrypt revoked cert from their ALPN-01 bug in 2022-01")
 			refreshCert = true
+		} else if certPublicKeyAlgoDoesntMatch(tlsSec.Cert, secConf) {
+			log.Printf("Requested key type (UseRSA: %t) doesn't match type of cert in secret %s", secConf.UseRSA, secConf.FullName())
+			refreshCert = true
 		}
 
 		if refreshCert {
@@ -493,4 +496,16 @@ func isRevokedLetsEncrypt(cert *x509.Certificate) bool {
 	O := cert.Issuer.Organization
 	return len(O) == 1 && O[0] == "Let's Encrypt" &&
 		cert.NotBefore.Before(letsEncryptFixDeployTime)
+}
+
+// certPublicKeyAlgoDoesntMatch returns true if the type of key (RSA or ECDSA) used to
+// generate the existing certificate differs from the type requested.
+func certPublicKeyAlgoDoesntMatch(cert *x509.Certificate, secConf *secretConf) bool {
+	// If you adjust this UseRSA code, be sure to also adjust the use of UseRSA
+	// in the Let's Encrypt code.
+	if secConf.UseRSA {
+		return cert.PublicKeyAlgorithm != x509.RSA
+	} else {
+		return cert.PublicKeyAlgorithm != x509.ECDSA
+	}
 }

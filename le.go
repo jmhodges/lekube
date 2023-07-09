@@ -50,6 +50,8 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf) (*newCert
 	var priv crypto.PrivateKey
 	var pblock *pem.Block
 	var sigAlg x509.SignatureAlgorithm
+	// If you adjust this UseRSA code, be sure to also adjust
+	// certPublicKeyAlgoDoesntMatch in main.go
 	if sconf.UseRSA {
 		k, err := rsa.GenerateKey(rand.Reader, 2048)
 		if err != nil {
