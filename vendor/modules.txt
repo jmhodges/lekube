@@ -128,7 +128,7 @@ github.com/google/go-cmp/cmp/internal/value
 ## explicit; go 1.12
 github.com/google/gofuzz
 github.com/google/gofuzz/bytesource
-# github.com/google/s2a-go v0.1.4
+# github.com/google/s2a-go v0.1.5
 ## explicit; go 1.16
 github.com/google/s2a-go
 github.com/google/s2a-go/fallback
@@ -149,6 +149,7 @@ github.com/google/s2a-go/internal/v2
 github.com/google/s2a-go/internal/v2/certverifier
 github.com/google/s2a-go/internal/v2/remotesigner
 github.com/google/s2a-go/internal/v2/tlsconfigstore
+github.com/google/s2a-go/retry
 github.com/google/s2a-go/stream
 # github.com/google/uuid v1.3.0
 ## explicit
