@@ -13,7 +13,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230803162519-f966b187b2e5
 	k8s.io/api v0.28.1
 	k8s.io/apimachinery v0.28.1
-	k8s.io/client-go v0.28.0
+	k8s.io/client-go v0.28.1
 )
 
 require (
