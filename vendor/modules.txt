@@ -188,8 +188,8 @@ github.com/modern-go/reflect2
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/prometheus/prometheus v0.46.0
-## explicit; go 1.19
+# github.com/prometheus/prometheus v0.47.0
+## explicit; go 1.20
 github.com/prometheus/prometheus/model/value
 # go.opencensus.io v0.24.0
 ## explicit; go 1.13
