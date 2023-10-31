@@ -3,8 +3,8 @@ cloud.google.com/go/compute v1.23.1 h1:V97tBoDaZHb6leicZ1G6DLK2BAaZLJ/7+9BB/En3h
 cloud.google.com/go/compute v1.23.1/go.mod h1:CqB3xpmPKKt3OJpW2ndFIXnA9A4xAy/F3Xp1ixncW78=
 cloud.google.com/go/compute/metadata v0.2.3 h1:mg4jlk7mCAj6xXp9UJ4fjI9VUI5rubuGBW5aJ7UnBMY=
 cloud.google.com/go/compute/metadata v0.2.3/go.mod h1:VAV5nSsACxMJvgaAuX6Pk2AawlZn8kiOGuCv6gTkwuA=
-cloud.google.com/go/monitoring v1.16.1 h1:CTklIuUkS5nCricGojPwdkSgPsCTX2HmYTxFDg+UvpU=
-cloud.google.com/go/monitoring v1.16.1/go.mod h1:6HsxddR+3y9j+o/cMJH6q/KJ/CBTvM/38L/1m7bTRJ4=
+cloud.google.com/go/monitoring v1.16.2 h1:gx7BDZcoRqX5DfuJzw9LdhVjEkqCLmDXScdnrmIy9ik=
+cloud.google.com/go/monitoring v1.16.2/go.mod h1:B44KGwi4ZCF8Rk/5n+FWeispDXoKSk9oss2QNlXJBgc=
 cloud.google.com/go/trace v1.10.2 h1:80Rh4JSqJLfe/xGNrpyO4MQxiFDXcHG1XrsevfmrIRQ=
 cloud.google.com/go/trace v1.10.2/go.mod h1:NPXemMi6MToRFcSxRl2uDnu/qAlAQ3oULUphcHGh1vA=
 contrib.go.opencensus.io/exporter/stackdriver v0.13.14 h1:zBakwHardp9Jcb8sQHcHpXy/0+JIb1M8KjigCJzx7+4=
