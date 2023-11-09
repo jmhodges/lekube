@@ -9,7 +9,7 @@ require (
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/oauth2 v0.13.0
-	golang.org/x/time v0.3.0
+	golang.org/x/time v0.4.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97
 	k8s.io/api v0.28.3
 	k8s.io/apimachinery v0.28.3
