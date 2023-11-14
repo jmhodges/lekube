@@ -4,7 +4,7 @@
 # When a new debian stable comes out, we have to update this and the distroless
 # base image at the same time. Dependabot won't do it for us, owing to how it
 # interprets tags as release histories not versions.
-FROM golang:1.21.3-bookworm@sha256:5bafbbb109f02aaf6b41ddc19f54919773c3006f1cbda1599112603367642f0e as build
+FROM golang:1.21.4-bookworm@sha256:85aacbed94a248f792beb89198649ddbc730649054b397f8d689e9c4c4cceab7 as build
 
 WORKDIR /go/src/github.com/jmhodges/lekube
 ADD . /go/src/github.com/jmhodges/lekube
