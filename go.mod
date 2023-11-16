@@ -5,7 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go/compute/metadata v0.2.3
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
-	github.com/go-jose/go-jose/v3 v3.0.0
+	github.com/go-jose/go-jose/v3 v3.0.1
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.15.0
 	golang.org/x/oauth2 v0.13.0
