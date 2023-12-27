@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -9,9 +10,8 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"go.opencensus.io/stats"
 )
 
 // newConfLoader does I/O immediately to validate the config file at the given
@@ -25,7 +25,7 @@ import (
 // that file path and that would cause a reboot and another account
 // acquisition. That's a bummer. So, take the L and load the config file here
 // and let Watch eat and record the errors.
-func newConfLoader(fp string, lastCheck, lastChange *stats.Int64Measure) (*confLoader, *allConf, error) {
+func newConfLoader(fp string, lastCheck, lastChange *atomic.Int64) (*confLoader, *allConf, error) {
 	cl := &confLoader{
 		path:       fp,
 		lastCheck:  lastCheck,
@@ -33,16 +33,16 @@ func newConfLoader(fp string, lastCheck, lastChange *stats.Int64Measure) (*confL
 	}
 	err := cl.load()
 	if err != nil {
-		loadConfigErrors.M(1)
+		loadConfigErrors.Add(context.TODO(), 1)
 		return nil, nil, err
 	}
-	loadConfigSuccesses.M(1)
+	loadConfigSuccesses.Add(context.TODO(), 1)
 	return cl, cl.Get(), nil
 }
 
 type confLoader struct {
 	path      string
-	lastCheck *stats.Int64Measure
+	lastCheck *atomic.Int64
 
 	// loadMu locks calls to confLoader.load, but doesn't prevent concurrent
 	// reads of confLoader.conf (that's handled by confMu). This allows us to
@@ -56,7 +56,7 @@ type confLoader struct {
 	// of the file and one with and older version setting the conf at a later
 	// time than the others.
 	confMu     sync.Mutex
-	lastChange *stats.Int64Measure
+	lastChange *atomic.Int64
 	lastHash   [sha256.Size]byte
 	conf       *allConf
 }
@@ -74,7 +74,7 @@ func (cl *confLoader) Get() *allConf {
 func (cl *confLoader) Watch() *allConf {
 	var prevErr error
 	for {
-		loadConfigAttempts.M(1)
+		loadConfigAttempts.Add(context.TODO(), 1)
 		start := time.Now()
 		err := cl.load()
 		c := cl.Get()
@@ -83,7 +83,7 @@ func (cl *confLoader) Watch() *allConf {
 				log.Printf("previous config file error resolved and load was successful")
 			}
 			prevErr = nil
-			loadConfigSuccesses.M(1)
+			loadConfigSuccesses.Add(context.TODO(), 1)
 			return c
 		}
 
@@ -100,18 +100,18 @@ func (cl *confLoader) Watch() *allConf {
 				// If the last load where the config had actually changed was
 				// successful, then the good conf remained in place in this load
 				// and we can record it as a success.
-				loadConfigSuccesses.M(1)
+				loadConfigSuccesses.Add(context.TODO(), 1)
 			} else {
 				// If the last load where the config had actually changed was in
 				// error, then the bad conf remained, so we can record this load
 				// as an error. However, we don't want the logs consumed
 				// entirely with repeated error messages, so just increment the
 				// stat.
-				loadConfigErrors.M(1)
+				loadConfigErrors.Add(context.TODO(), 1)
 			}
 		} else {
 			prevErr = err
-			recordError(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
+			recordErrorMetric(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 		}
 		time.Sleep(next.Sub(start))
 	}
@@ -123,7 +123,7 @@ func (cl *confLoader) load() error {
 	cl.loadMu.Lock()
 	defer cl.loadMu.Unlock()
 
-	cl.lastCheck.M(time.Now().UnixNano())
+	cl.lastCheck.Store(time.Now().UnixNano())
 	b, err := os.ReadFile(cl.path)
 	if err != nil {
 		return err
@@ -147,7 +147,7 @@ func (cl *confLoader) load() error {
 
 	cl.conf = conf
 	cl.lastHash = h
-	cl.lastChange.M(time.Now().UnixNano())
+	cl.lastChange.Store(time.Now().UnixNano())
 	return nil
 }
 
