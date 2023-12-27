@@ -1,6 +1,8 @@
 module github.com/jmhodges/lekube
 
-go 1.20
+go 1.21
+
+toolchain go1.21.5
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3
