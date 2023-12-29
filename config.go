@@ -137,7 +137,7 @@ func (cl *confLoader) load() error {
 		return errSameHash
 	}
 
-	conf, err := unmarshalConf(cl.path)
+	conf, err := unmarshalConf(b)
 	if err != nil {
 		return err
 	}
@@ -215,14 +215,9 @@ func dirURLFromConf(conf *allConf) string {
 	return "https://acme-staging-v02.api.letsencrypt.org/directory"
 }
 
-func unmarshalConf(fp string) (*allConf, error) {
-	f, err := os.Open(fp)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func unmarshalConf(jsonData []byte) (*allConf, error) {
 	conf := &allConf{}
-	err = json.NewDecoder(f).Decode(conf)
+	err := json.Unmarshal(jsonData, conf)
 	if err != nil {
 		return nil, err
 	}
