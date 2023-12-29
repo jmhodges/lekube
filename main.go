@@ -255,7 +255,7 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 	for _, secConf := range conf.Secrets {
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
 		stats.Record(ctx, fetchSecretAttempts.M(1))
-		tlsSec, err := fetchK8SSecret(ctx, client.Secrets(*secConf.Namespace), secConf.Name)
+		tlsSec, err := fetchK8SSecret(ctx, client.Secrets(secConf.Namespace), secConf.Name)
 		if err != nil {
 			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
@@ -320,7 +320,7 @@ func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *le
 	}
 
 	stats.Record(ctx, storeSecretAttempts.M(1))
-	err = storeK8SSecret(ctx, client.Secrets(*secConf.Namespace), secConf, oldSec, leCert)
+	err = storeK8SSecret(ctx, client.Secrets(secConf.Namespace), secConf, oldSec, leCert)
 	if err != nil {
 		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return

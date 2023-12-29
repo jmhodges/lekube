@@ -39,27 +39,22 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	}
 	defaultNS := "default"
 	stagingNS := "staging"
-	emptyNS := ""
+
 	secs := []*secretConf{
 		{
-			Namespace: &defaultNS,
+			Namespace: defaultNS,
 			Name:      "test",
 			Domains:   []string{"example.com"},
 		},
 		{
-			Namespace: &defaultNS,
+			Namespace: defaultNS,
 			Name:      "missingtest",
 			UseRSA:    true,
 			Domains:   []string{"www.example.com", "alt.example.com"},
 		},
 		{
-			Namespace: &stagingNS,
+			Namespace: stagingNS,
 			Name:      "missingtest",
-			Domains:   []string{"test.example.com"},
-		},
-		{
-			Namespace: &emptyNS,
-			Name:      "nonamespace",
 			Domains:   []string{"test.example.com"},
 		},
 	}
@@ -91,6 +86,18 @@ func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 	expectedRenewDur := jsonDuration(504 * time.Hour)
 	if c.StartRenewDur != expectedRenewDur {
 		t.Errorf("default start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
+	}
+}
+
+func TestDisallowEmptyNamespaceInSecConfig(t *testing.T) {
+	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
+	_, _, err := newConfLoader("testdata/no_ns.json", fakeInt, fakeInt)
+	if err == nil {
+		t.Fatal("should have errored but didn't")
+	}
+	expectedMsg := "no Namespace given for secret config at index 0 in \"secrets\""
+	if err.Error() != expectedMsg {
+		t.Errorf("want error %#v, got %#v", expectedMsg, err.Error())
 	}
 }
 

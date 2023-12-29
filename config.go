@@ -162,14 +162,14 @@ type allConf struct {
 }
 
 type secretConf struct {
-	Namespace *string  `json:"namespace"`
+	Namespace string   `json:"namespace"`
 	Name      string   `json:"name"`
 	Domains   []string `json:"domains"`
 	UseRSA    bool     `json:"use_rsa"` // use ECDSA if not set or if set to false, RSA for certs
 }
 
 func (sconf *secretConf) FullName() nsSecName {
-	return nsSecName{*sconf.Namespace, sconf.Name}
+	return nsSecName{sconf.Namespace, sconf.Name}
 }
 
 type nsSecName struct {
@@ -244,8 +244,8 @@ func validateConf(conf *allConf) error {
 		if secConf.Name == "" {
 			return fmt.Errorf("no Name given for secret config at index %d in \"secrets\"", i)
 		}
-		if secConf.Namespace == nil {
-			return fmt.Errorf("no Namespace given for secret config at index %d in \"secrets\" (is allowed to be the empty string)", i)
+		if secConf.Namespace == "" {
+			return fmt.Errorf("no Namespace given for secret config at index %d in \"secrets\"", i)
 		}
 		name := secConf.FullName()
 		if secs[name] {
