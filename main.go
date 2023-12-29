@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -152,7 +153,12 @@ func main() {
 	if err := view.Register(statViews...); err != nil {
 		log.Fatalf("unable to register the opencensus stat views: %s", err)
 	}
-	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
+	fileSys := os.DirFS(".").(fs.ReadFileFS)
+	absConfPath, err := filepath.Abs(*confPath)
+	if err != nil {
+		log.Fatalf("unable to get absolute path of %s: %s", *confPath, err)
+	}
+	cLoader, conf, err := newConfLoader(fileSys, absConfPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
 	}

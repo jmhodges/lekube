@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -25,8 +25,9 @@ import (
 // that file path and that would cause a reboot and another account
 // acquisition. That's a bummer. So, take the L and load the config file here
 // and let Watch eat and record the errors.
-func newConfLoader(fp string, lastCheck, lastChange *stats.Int64Measure) (*confLoader, *allConf, error) {
+func newConfLoader(fileSys fs.ReadFileFS, fp string, lastCheck, lastChange *stats.Int64Measure) (*confLoader, *allConf, error) {
 	cl := &confLoader{
+		fileSys:    fileSys,
 		path:       fp,
 		lastCheck:  lastCheck,
 		lastChange: lastChange,
@@ -41,6 +42,7 @@ func newConfLoader(fp string, lastCheck, lastChange *stats.Int64Measure) (*confL
 }
 
 type confLoader struct {
+	fileSys   fs.ReadFileFS
 	path      string
 	lastCheck *stats.Int64Measure
 
@@ -124,7 +126,7 @@ func (cl *confLoader) load() error {
 	defer cl.loadMu.Unlock()
 
 	cl.lastCheck.M(time.Now().UnixNano())
-	b, err := os.ReadFile(cl.path)
+	b, err := cl.fileSys.ReadFile(cl.path)
 	if err != nil {
 		return err
 	}

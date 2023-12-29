@@ -1,7 +1,9 @@
 package main
 
 import (
+	"io/fs"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -9,9 +11,11 @@ import (
 	"go.opencensus.io/stats"
 )
 
+var testFS = os.DirFS(".").(fs.ReadFileFS)
+
 func TestConfigLoadGoldenPath(t *testing.T) {
 	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
-	cl, c, err := newConfLoader("./testdata/test.json", fakeInt, fakeInt)
+	cl, c, err := newConfLoader(testFS, "testdata/test.json", fakeInt, fakeInt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +80,7 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 
 func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 	fakeInt := stats.Int64("fake", "fake", stats.UnitDimensionless)
-	cl, c, err := newConfLoader("./testdata/no_config_check_interval.json", fakeInt, fakeInt)
+	cl, c, err := newConfLoader(testFS, "testdata/no_config_check_interval.json", fakeInt, fakeInt)
 	if err != nil {
 		t.Fatal(err)
 	}
