@@ -7,15 +7,9 @@
   "start_renew_duration": "3h",
   "secrets": [
     {
-      "namespace": "default",
+      "namespace": "",
       "name": "test",
       "domains": ["example.com"]
-    },
-    {
-      "namespace": "default",
-      "name": "missingtest",
-      "use_rsa": true,
-      "domains": ["www.example.com", "alt.example.com"]
     },
     {
       "namespace": "staging",
