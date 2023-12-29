@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -125,7 +124,7 @@ func (cl *confLoader) load() error {
 	defer cl.loadMu.Unlock()
 
 	cl.lastCheck.M(time.Now().UnixNano())
-	b, err := ioutil.ReadFile(cl.path)
+	b, err := os.ReadFile(cl.path)
 	if err != nil {
 		return err
 	}
