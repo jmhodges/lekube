@@ -76,7 +76,7 @@ func (cl *confLoader) Get() *allConf {
 	}
 	conf.Secrets = make([]*secretConf, len(cl.conf.Secrets))
 	for i, s := range cl.conf.Secrets {
-		conf.Secrets[i] = s.Copy()
+		conf.Secrets[i] = s.DeepCopy()
 	}
 	return conf
 }
@@ -195,7 +195,7 @@ func (sconf *secretConf) FullName() nsSecName {
 	return nsSecName{sconf.Namespace, sconf.Name}
 }
 
-func (sconf *secretConf) Copy() *secretConf {
+func (sconf *secretConf) DeepCopy() *secretConf {
 	return &secretConf{
 		Namespace: sconf.Namespace,
 		Name:      sconf.Name,
