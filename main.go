@@ -19,7 +19,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cloud.google.com/go/compute/metadata"
 	mexporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
 	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opentelemetry.io/contrib/detectors/gcp"
@@ -92,6 +91,14 @@ func main() {
 		os.Exit(2)
 	}
 
+	// bootTimeCtx is a Context that should only be used during initial startup
+	// of the lekube process. It's not exactly how long we allow lekube to boot
+	// (the k8s deployment's timeout is likely lower), and it doesn't gate some
+	// of the http Server boots, but it sets a a good upper bound for
+	// initializing our metrics and similar.
+	bootTimeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
 	usePrintTracer := os.Getenv("USE_PRINT_EXPORTER") != ""
 	log.Println("USE_PRINT_EXPORTER is", usePrintTracer)
 	traceProviderOpts := []sdktrace.TracerProviderOption{}
@@ -109,39 +116,31 @@ func main() {
 		metricProviderOpts = append(metricProviderOpts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)))
 	}
 
-	if metadata.OnGCE() {
-		// We don't want to load these checks because we want the dev
-		// environment to work quietly and not crash. Plus, the errors
-		// FindDefaultCredentials returns are undocumented and unexported in its
-		// API.
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-		traceExporter, err := texporter.New()
-		if err != nil {
-			log.Fatalf("unable to create GCP OpenTelemetry trace exporter: %v", err)
-		}
-		metricExporter, err := mexporter.New()
-		if err != nil {
-			log.Fatalf("unable to create GCP OpenTelemetry metric exporter: %v", err)
-		}
-		metricReader := sdkmetric.NewPeriodicReader(metricExporter)
-		// FIXME apply the resources that aren't gcp specific out side of this if, maybe?
-		resource, err := resource.New(ctx,
-			// Use the GCP resource detector to detect information about the GCP platform
-			resource.WithDetectors(gcp.NewDetector()),
-			// Keep the default detectors
-			resource.WithTelemetrySDK(),
-			// Add your own custom attributes to identify your application
-			resource.WithAttributes(
-				semconv.ServiceName("lekube"),
-			),
-		)
-		if err != nil {
-			log.Fatalf("unable to create GCP OpenTelemetry resource mapping: %s", err)
-		}
-		traceProviderOpts = append(traceProviderOpts, sdktrace.WithResource(resource), sdktrace.WithBatcher(traceExporter))
-		metricProviderOpts = append(metricProviderOpts, sdkmetric.WithResource(resource), sdkmetric.WithReader(metricReader))
+	traceExporter, err := texporter.New()
+	if err != nil {
+		log.Fatalf("unable to create GCP OpenTelemetry trace exporter: %v", err)
 	}
+	metricExporter, err := mexporter.New()
+	if err != nil {
+		log.Fatalf("unable to create GCP OpenTelemetry metric exporter: %v", err)
+	}
+	metricReader := sdkmetric.NewPeriodicReader(metricExporter)
+
+	resource, err := resource.New(bootTimeCtx,
+		// Use the GCP resource detector to detect information about the GCP platform
+		resource.WithDetectors(gcp.NewDetector()),
+		// Keep the default detectors
+		resource.WithTelemetrySDK(),
+		// Add your own custom attributes to identify your application
+		resource.WithAttributes(
+			semconv.ServiceName("lekube"),
+		),
+	)
+	if err != nil {
+		log.Fatalf("unable to create GCP OpenTelemetry resource mapping: %s", err)
+	}
+	traceProviderOpts = append(traceProviderOpts, sdktrace.WithResource(resource), sdktrace.WithBatcher(traceExporter))
+	metricProviderOpts = append(metricProviderOpts, sdkmetric.WithResource(resource), sdkmetric.WithReader(metricReader))
 
 	tp := sdktrace.NewTracerProvider(traceProviderOpts...)
 	mp := sdkmetric.NewMeterProvider(metricProviderOpts...)
@@ -177,12 +176,11 @@ func main() {
 
 	limit := rate.NewLimiter(rate.Limit(3), 3)
 	lcm := newLEClientMaker(httpClient, accountKey, responder, limit)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	_, err = lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
+
+	_, err = lcm.Make(bootTimeCtx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
 		log.Fatalf("unable to make an account with %s using email %s: %s", dirURLFromConf(conf), conf.Email, err)
 	}
-	cancel()
 
 	m := http.NewServeMux()
 	m.HandleFunc("/debug/", func(w http.ResponseWriter, r *http.Request) {
