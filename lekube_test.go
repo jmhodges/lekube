@@ -20,24 +20,24 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := cl.Get()
-	if c != c2 {
+	if !reflect.DeepEqual(c, c2) {
 		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
 	}
 	email := "fake@example.com"
 	if c.Email != email {
 		t.Errorf("email: want %#v, got %#v", email, c.Email)
 	}
-	if !*c.UseProd {
-		t.Errorf("use_prod: want %t, got %t", true, *c.UseProd)
+	if !c.UseProd {
+		t.Errorf("use_prod: want %t, got %t", true, c.UseProd)
 	}
 	if !c.AllowRemoteDebug {
 		t.Errorf("allow_remote_debug: want %t, got %t", true, c.AllowRemoteDebug)
 	}
-	expectedCheck := jsonDuration(3 * time.Minute)
+	expectedCheck := 3 * time.Minute
 	if c.ConfigCheckInterval != expectedCheck {
 		t.Errorf("config_check_interval: want %s, got %s", expectedCheck, c.ConfigCheckInterval)
 	}
-	expectedRenewDur := jsonDuration(3 * time.Hour)
+	expectedRenewDur := 3 * time.Hour
 	if c.StartRenewDur != expectedRenewDur {
 		t.Errorf("start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
 	}
@@ -80,14 +80,14 @@ func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := cl.Get()
-	if c != c2 {
+	if !reflect.DeepEqual(c, c2) {
 		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
 	}
-	expected := jsonDuration(30 * time.Second)
+	expected := 30 * time.Second
 	if c.ConfigCheckInterval != expected {
 		t.Errorf("default config_check_interval: want %s, got %s", expected, c.ConfigCheckInterval)
 	}
-	expectedRenewDur := jsonDuration(504 * time.Hour)
+	expectedRenewDur := 504 * time.Hour
 	if c.StartRenewDur != expectedRenewDur {
 		t.Errorf("default start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
 	}
