@@ -95,17 +95,14 @@ func (cl *confLoader) Watch() *allConf {
 			if prevErr != nil {
 				log.Printf("previous config file error resolved and load was successful")
 			}
-			prevErr = nil
 			loadConfigSuccesses.Add(context.TODO(), 1)
 			return c
 		}
 
-		waitDur := 30 * time.Second
 		// c is always non-nil here since we require the first load of the
 		// config to occur at construction time in newConfLoader. We might
 		// have a c from a previous load, but it'll be useful.
-		waitDur = c.ConfigCheckInterval
-		next := start.Add(waitDur)
+		next := start.Add(c.ConfigCheckInterval)
 
 		prevLoadSuccessful := prevErr == nil
 		if err == errSameHash {
