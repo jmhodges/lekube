@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -15,24 +16,25 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
-	"contrib.go.opencensus.io/exporter/stackdriver"
-	_ "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
-	_ "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
-	"go.opencensus.io/examples/exporter"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
-	_ "go.opentelemetry.io/contrib/detectors/gcp"
+	mexporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
+	texporter "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
+	"go.opentelemetry.io/contrib/detectors/gcp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
-	_ "go.opentelemetry.io/otel/metric"
-	_ "go.opentelemetry.io/otel/sdk/metric"
-	_ "go.opentelemetry.io/otel/sdk/trace"
-	_ "go.opentelemetry.io/otel/trace"
-	"golang.org/x/oauth2/google"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"golang.org/x/time/rate"
-	"google.golang.org/genproto/googleapis/api/monitoredres"
 	kubeapi "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,36 +49,37 @@ var (
 	httpsAddr    = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
 	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
 
-	_tracer = otel.Tracer("lekube")
-	_meter  = otel.Meter("lekube")
+	tracer = otel.Tracer("lekube")
+	meter  = otel.Meter("lekube")
 
 	fetchLECertPrefix    = "stages/fetch-cert/"
-	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
-	fetchLECertErrors    = stats.Int64(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
-	fetchLECertSuccesses = stats.Int64(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
+	fetchLECertAttempts  = mustInt64Counter(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.")
+	fetchLECertErrors    = mustInt64Counter(fetchLECertPrefix+"errors", "The number of errors when fetching the Let's Encrypt certificate.")
+	fetchLECertSuccesses = mustInt64Counter(fetchLECertPrefix+"successes", "The number of successes when fetching the Let's Encrypt certificate.")
 
 	fetchSecretPrefix    = "stages/fetch-secret/"
-	fetchSecretAttempts  = stats.Int64(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.", stats.UnitDimensionless)
-	fetchSecretErrors    = stats.Int64(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.", stats.UnitDimensionless)
-	fetchSecretSuccesses = stats.Int64(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.", stats.UnitDimensionless)
+	fetchSecretAttempts  = mustInt64Counter(fetchSecretPrefix+"attempts", "The number of attempts when fetching a TLS k8s Secret.")
+	fetchSecretErrors    = mustInt64Counter(fetchSecretPrefix+"errors", "The number of errors when fetching a TLS k8s Secret.")
+	fetchSecretSuccesses = mustInt64Counter(fetchSecretPrefix+"successes", "The number of successes when fetching a TLS k8s Secret.")
 
 	storeSecretPrefix    = "stages/store-secret/"
-	storeSecretAttempts  = stats.Int64(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.", stats.UnitDimensionless)
-	storeSecretErrors    = stats.Int64(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.", stats.UnitDimensionless)
-	storeSecretSuccesses = stats.Int64(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.", stats.UnitDimensionless)
-	storeSecretUpdates   = stats.Int64(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.", stats.UnitDimensionless)
-	storeSecretCreates   = stats.Int64(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.", stats.UnitDimensionless)
+	storeSecretAttempts  = mustInt64Counter(storeSecretPrefix+"attempts", "The number of attempts when storing a TLS k8s Secret.")
+	storeSecretErrors    = mustInt64Counter(storeSecretPrefix+"errors", "The number of errors when storing a TLS k8s Secret.")
+	storeSecretSuccesses = mustInt64Counter(storeSecretPrefix+"successes", "The number of successes when storing a TLS k8s Secret.")
+	storeSecretUpdates   = mustInt64Counter(storeSecretPrefix+"updates", "The number of times a TLS k8s Secret was stored with an Update verb.")
+	storeSecretCreates   = mustInt64Counter(storeSecretPrefix+"creates", "The number of times a TLS k8s Secret was stored with a Create verb.")
 
 	loadConfigPrefix    = "stages/load-config/"
-	loadConfigAttempts  = stats.Int64(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.", stats.UnitDimensionless)
-	loadConfigErrors    = stats.Int64(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.", stats.UnitDimensionless)
-	loadConfigSuccesses = stats.Int64(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.", stats.UnitDimensionless)
+	loadConfigAttempts  = mustInt64Counter(loadConfigPrefix+"attempts", "The number of attempts when loading the lekube config.")
+	loadConfigErrors    = mustInt64Counter(loadConfigPrefix+"errors", "The number of errors when loading the lekube config.")
+	loadConfigSuccesses = mustInt64Counter(loadConfigPrefix+"successes", "The number of successes when loading the lekube config.")
 
-	runCount   = stats.Int64("runs", "The number of top-level runs lekube has made.", stats.UnitDimensionless)
-	errorCount = stats.Int64("errors", "The number of top-level runs lekube has seen.", stats.UnitDimensionless)
+	runStartsCount   = mustInt64Counter("run-starts", "The number of top-level runs lekube has started.")
+	runFinishesCount = mustInt64Counter("run-finishes", "The number of top-level runs lekube has finished.")
+	errorCount       = mustInt64Counter("errors", "The number of top-level runs lekube has seen.")
 
-	lastCheck  = stats.Int64("last-config-check", "The unix epoch time that the configuration file was checked for changes.", stats.UnitDimensionless)
-	lastChange = stats.Int64("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.", stats.UnitDimensionless)
+	lastCheck, _  = mustInt64Gauge("last-config-check", "The unix epoch time that the configuration file was checked for changes.")
+	lastChange, _ = mustInt64Gauge("last-config-change", "The unix epoch time that the configuration file was reloaded because changes were found.")
 
 	buildSHA = "<debug>"
 )
@@ -91,12 +94,21 @@ func main() {
 
 	usePrintTracer := os.Getenv("USE_PRINT_EXPORTER") != ""
 	log.Println("USE_PRINT_EXPORTER is", usePrintTracer)
+	traceProviderOpts := []sdktrace.TracerProviderOption{}
+	metricProviderOpts := []sdkmetric.Option{}
 	if usePrintTracer {
-		exporter := &exporter.PrintExporter{}
-		view.RegisterExporter(exporter)
+		traceExporter, err := stdouttrace.New()
+		if err != nil {
+			log.Fatalf("unable to create OpenTelemetry stdout tracer: %v", err)
+		}
+		metricExporter, err := stdoutmetric.New()
+		if err != nil {
+			log.Fatalf("unable to create OpenTelemetry stdout metric exporter: %v", err)
+		}
+		traceProviderOpts = append(traceProviderOpts, sdktrace.WithBatcher(traceExporter))
+		metricProviderOpts = append(metricProviderOpts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)))
 	}
 
-	view.SetReportingPeriod(1 * time.Minute)
 	if metadata.OnGCE() {
 		// We don't want to load these checks because we want the dev
 		// environment to work quietly and not crash. Plus, the errors
@@ -104,65 +116,40 @@ func main() {
 		// API.
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		creds, err := google.FindDefaultCredentials(ctx)
+		traceExporter, err := texporter.New()
 		if err != nil {
-			log.Fatalf("unable to find default Google credentials for tracing and metrics: %s", err)
+			log.Fatalf("unable to create GCP OpenTelemetry trace exporter: %v", err)
 		}
-		projID, err := metadata.ProjectID()
+		metricExporter, err := mexporter.New()
 		if err != nil {
-			log.Fatalf("unable to get ProjectID from GCE metadata: %s", err)
+			log.Fatalf("unable to create GCP OpenTelemetry metric exporter: %v", err)
 		}
-		location, err := metadata.InstanceAttributeValue("cluster-location")
+		metricReader := sdkmetric.NewPeriodicReader(metricExporter)
+		// FIXME apply the resources that aren't gcp specific out side of this if, maybe?
+		resource, err := resource.New(ctx,
+			// Use the GCP resource detector to detect information about the GCP platform
+			resource.WithDetectors(gcp.NewDetector()),
+			// Keep the default detectors
+			resource.WithTelemetrySDK(),
+			// Add your own custom attributes to identify your application
+			resource.WithAttributes(
+				semconv.ServiceName("lekube"),
+			),
+		)
 		if err != nil {
-			log.Fatalf("unable to get cluster-location InstanceAttributeValue from GCE metadata")
+			log.Fatalf("unable to create GCP OpenTelemetry resource mapping: %s", err)
 		}
-		clusterName, err := metadata.InstanceAttributeValue("cluster-name")
-		if err != nil {
-			log.Fatalf("unable to get cluster-name InstanceAttributeValue from GCE emetadata")
-		}
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{
-			ProjectID: creds.ProjectID,
-			Resource: &monitoredres.MonitoredResource{
-				Type: "k8s_container",
-				Labels: map[string]string{
-					"project_id":     projID,
-					"location":       location,
-					"cluster_name":   clusterName,
-					"namespace_name": os.Getenv("K8S_NAMESPACE"),
-					"pod_name":       os.Getenv("K8S_POD"),
-					"container_name": os.Getenv("K8S_CONTAINER"),
-				},
-			},
-			OnError: func(err error) {
-				log.Printf("stackdriver exporter saw error: %s", err)
-			},
-		})
-		if err != nil {
-			log.Fatalf("unable to create Stackdriver opencensus exporter: %s", err)
-		}
-		view.RegisterExporter(exporter)
+		traceProviderOpts = append(traceProviderOpts, sdktrace.WithResource(resource), sdktrace.WithBatcher(traceExporter))
+		metricProviderOpts = append(metricProviderOpts, sdkmetric.WithResource(resource), sdkmetric.WithReader(metricReader))
 	}
 
-	statViews := countViews(
-		fetchSecretAttempts,
-		fetchSecretErrors,
-		fetchSecretSuccesses,
-		storeSecretAttempts,
-		storeSecretErrors,
-		storeSecretSuccesses,
-		storeSecretUpdates,
-		storeSecretCreates,
-		loadConfigAttempts,
-		loadConfigErrors,
-		loadConfigSuccesses,
-		runCount,
-		errorCount,
-	)
+	tp := sdktrace.NewTracerProvider(traceProviderOpts...)
+	mp := sdkmetric.NewMeterProvider(metricProviderOpts...)
+	otel.SetTracerProvider(tp)
+	otel.SetMeterProvider(mp)
+	defer tp.Shutdown(context.Background())
+	defer mp.Shutdown(context.Background())
 
-	statViews = append(statViews, latestViews(lastCheck, lastChange)...)
-	if err := view.Register(statViews...); err != nil {
-		log.Fatalf("unable to register the opencensus stat views: %s", err)
-	}
 	cLoader, conf, err := newConfLoader(*confPath, lastCheck, lastChange)
 	if err != nil {
 		log.Fatalf("unable to load configuration: %s", err)
@@ -211,7 +198,7 @@ func main() {
 		http.DefaultServeMux.ServeHTTP(w, r)
 	})
 
-	m.Handle("/", responder)
+	m.Handle("/", otelhttp.NewHandler(responder, "leresponder"))
 
 	watchCh := make(chan *allConf)
 	runCh := make(chan *allConf)
@@ -256,27 +243,62 @@ func main() {
 	}
 }
 
+func mustInt64Counter(name, description string) metric.Int64Counter {
+	c, err := meter.Int64Counter(name, metric.WithDescription(description))
+	if err != nil {
+		log.Fatalf("mustInt64Counter failed for name: %#v; description: %#v: %s", name, description, err)
+	}
+	return c
+}
+
+func mustInt64Gauge(name, description string) (*atomic.Int64, metric.Int64ObservableGauge) {
+	rawGauge := new(atomic.Int64)
+	g, err := meter.Int64ObservableGauge(name, metric.WithInt64Callback(func(_ context.Context, obs metric.Int64Observer) error {
+		obs.Observe(rawGauge.Load())
+		return nil
+	}))
+	if err != nil {
+		log.Fatalf("mustInt64Gauge failed for name: %#v; description: %#v: %s", name, description, err)
+	}
+	return rawGauge, g
+}
+
 func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), leTimeout+20*time.Second)
 	defer cancel()
-	stats.Record(ctx, runCount.M(1))
+	ctx, span := tracer.Start(ctx, "lekube/run")
+	defer span.End()
+	runStartsCount.Add(ctx, 1)
+	defer runFinishesCount.Add(ctx, 1)
+
 	lcm.responder.Reset()
 	tlsSecs := make(map[nsSecName]*tlsSecret)
 	okaySecs := []*secretConf{}
+
+	fetchCtx, fetchSpan := tracer.Start(ctx, "fetch-secrets")
+	fetchAttempts := 0
+	fetchErrors := 0
+	fetchSuccesses := 0
 	for _, secConf := range conf.Secrets {
+		secCtx, secSpan := tracer.Start(fetchCtx, "fetch-secret")
 		log.Printf("Fetching kubernetes secret %s", secConf.FullName())
-		stats.Record(ctx, fetchSecretAttempts.M(1))
-		tlsSec, err := fetchK8SSecret(ctx, client.Secrets(secConf.Namespace), secConf.Name)
+		fetchSecretAttempts.Add(secCtx, 1)
+		secSpan.SetAttributes(attribute.String("secret.name", secConf.Name), attribute.String("secret.namespace", secConf.Namespace))
+		tlsSec, err := fetchK8SSecret(secCtx, client.Secrets(secConf.Namespace), secConf.Name)
 		if err != nil {
-			recordError(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
+			secSpan.SetStatus(codes.Error, err.Error())
+			recordErrorMetric(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
-		stats.Record(ctx, fetchSecretSuccesses.M(1))
+		secSpan.SetStatus(codes.Ok, "")
+		fetchSecretSuccesses.Add(secCtx, 1)
 		log.Printf("Fetched kubernetes secret %s", secConf.FullName())
 
 		tlsSecs[secConf.FullName()] = tlsSec
 		okaySecs = append(okaySecs, secConf)
 	}
+	fetchSpan.SetAttributes(attribute.Int("given", len(conf.Secrets)), attribute.Int("attempts", fetchAttempts), attribute.Int("errors", fetchErrors), attribute.Int("successes", fetchSuccesses))
+	fetchSpan.End()
 
 	for _, secConf := range okaySecs {
 		log.Printf("checking on %s", secConf.FullName())
@@ -312,31 +334,43 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 }
 
 func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTimeout time.Duration) {
-	stats.Record(ctx, fetchLECertAttempts.M(1))
-	acmeClient, err := lcm.Make(ctx, dirURLFromConf(conf), conf.Email)
+	fetchCtx, fetchSpan := tracer.Start(ctx, "fetch-certs")
+	defer fetchSpan.End()
+	fetchSpan.SetAttributes(attribute.String("secret.name", secConf.Name), attribute.String("secret.namespace", secConf.Namespace))
+	fetchLECertAttempts.Add(fetchCtx, 1)
+
+	acmeClient, err := lcm.Make(fetchCtx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
-		recordError(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
+		fetchSpan.SetStatus(codes.Error, fmt.Sprintf("unable to get client for Let's Encrypt API that is up to date: %s", err))
+		recordErrorMetric(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
 		return
 	}
-	leCert, err := acmeClient.CreateCert(ctx, secConf)
+	leCert, err := acmeClient.CreateCert(fetchCtx, secConf)
 	if err != nil {
-		recordError(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
+		fetchSpan.SetStatus(codes.Error, fmt.Sprintf("unable to get Let's Encrypt certificate: %s", err))
+		recordErrorMetric(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 		return
 	}
-	stats.Record(ctx, fetchLECertSuccesses.M(1))
+	fetchLECertSuccesses.Add(fetchCtx, 1)
 	log.Printf("have new cert for %s", secConf.FullName())
 	var oldSec *kubeapi.Secret
 	if tlsSec != nil {
 		oldSec = tlsSec.Secret
 	}
+	fetchSpan.End()
 
-	stats.Record(ctx, storeSecretAttempts.M(1))
+	storeCtx, storeSpan := tracer.Start(ctx, "store-secrets")
+	defer storeSpan.End()
+	storeSpan.SetAttributes(attribute.String("secret.name", secConf.Name), attribute.String("secret.namespace", secConf.Namespace))
+	storeSecretAttempts.Add(storeCtx, 1)
 	err = storeK8SSecret(ctx, client.Secrets(secConf.Namespace), secConf, oldSec, leCert)
 	if err != nil {
-		recordError(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
+		storeSpan.SetStatus(codes.Error, err.Error())
+		recordErrorMetric(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return
 	}
-	stats.Record(ctx, storeSecretSuccesses.M(1))
+	storeSpan.SetStatus(codes.Ok, "")
+	storeSecretSuccesses.Add(storeCtx, 1)
 	log.Printf("successfully stored new cert in %s", secConf.FullName())
 }
 
@@ -390,7 +424,7 @@ func storeK8SSecret(ctx context.Context, cl corev1.SecretInterface, secConf *sec
 		sec.Data["tls.crt"] = leCert.Cert
 		sec.Data["tls.key"] = leCert.Key
 
-		stats.Record(ctx, storeSecretCreates.M(1))
+		storeSecretCreates.Add(ctx, 1)
 		_, err := cl.Create(ctx, sec, metav1.CreateOptions{})
 		return err
 	}
@@ -399,7 +433,7 @@ func storeK8SSecret(ctx context.Context, cl corev1.SecretInterface, secConf *sec
 	sec.Data["tls.crt"] = leCert.Cert
 	sec.Data["tls.key"] = leCert.Key
 
-	stats.Record(ctx, storeSecretUpdates.M(1))
+	storeSecretUpdates.Add(ctx, 1)
 	_, err := cl.Update(ctx, sec, metav1.UpdateOptions{})
 
 	return err
@@ -424,19 +458,28 @@ const (
 	loadConfigStage
 )
 
-var stageErrors = map[stage]*stats.Int64Measure{
+var stageErrors = map[stage]metric.Int64Counter{
 	fetchSecStage:    fetchSecretErrors,
 	fetchLECertStage: fetchLECertErrors,
 	storeSecStage:    storeSecretErrors,
 	loadConfigStage:  loadConfigErrors,
 }
 
-func recordError(st stage, format string, args ...interface{}) {
-	// Any context we pass in here might have already expired, so we create a
-	// new one just for the stats.
+func recordErrorMetric(st stage, format string, args ...interface{}) {
+	// v1.21.0 and earlier of OpenTelemetry have a bug where they drop metrics
+	// that are added with a context that has been errored. This is unfortunate
+	// because it means timeouts and other Context cancelling errors will never
+	// be recorded. This will be fixed when
+	// https://github.com/open-telemetry/opentelemetry-go/commit/8e756513a630cc0e80c8b65528f27161a87a3cc8
+	// is released, but that's not yet. Until then, we'll set up a context on
+	// our own here. When dependabot bumps the otel version, our
+	// TestOtelDroppingContextData will fail. When that happens, we can change
+	// this func to accept a Context, fix the context.TODOs elsewhere, and
+	// remove the test.
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	stats.Record(ctx, errorCount.M(1), stageErrors[st].M(1))
+	errorCount.Add(ctx, 1)
+	stageErrors[st].Add(ctx, 1)
 	log.Printf(format, args...)
 }
 
@@ -469,32 +512,6 @@ func isBlockedRequest(r *http.Request) bool {
 		return !net.ParseIP(r.RemoteAddr[:i]).IsLoopback()
 	}
 	return false
-}
-
-func countViews(measures ...*stats.Int64Measure) []*view.View {
-	out := make([]*view.View, len(measures))
-	for i, m := range measures {
-		out[i] = &view.View{
-			Name:        "lekube/" + m.Name(),
-			Description: m.Description(),
-			Measure:     m,
-			Aggregation: view.Count(),
-		}
-	}
-	return out
-}
-
-func latestViews(measures ...*stats.Int64Measure) []*view.View {
-	out := make([]*view.View, len(measures))
-	for i, m := range measures {
-		out[i] = &view.View{
-			Name:        "lekube/" + m.Name(),
-			Description: m.Description(),
-			Measure:     m,
-			Aggregation: view.LastValue(),
-		}
-	}
-	return out
 }
 
 // https://community.letsencrypt.org/t/2022-01-25-issue-with-tls-alpn-01-validation-method/170450
