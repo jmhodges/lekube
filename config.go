@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -58,14 +59,26 @@ type confLoader struct {
 	confMu     sync.Mutex
 	lastChange *atomic.Int64
 	lastHash   [sha256.Size]byte
-	conf       *allConf
+	conf       *internalAllConf
 }
 
-// FIXME make it return the struct, for race condition reasons.
 func (cl *confLoader) Get() *allConf {
 	cl.confMu.Lock()
 	defer cl.confMu.Unlock()
-	return cl.conf
+	conf := &allConf{
+		Email:               cl.conf.Email,
+		UseProd:             cl.conf.UseProd != nil && *cl.conf.UseProd,
+		AllowRemoteDebug:    cl.conf.AllowRemoteDebug,
+		Secrets:             []*secretConf{},
+		TLSDir:              cl.conf.TLSDir,
+		ConfigCheckInterval: time.Duration(cl.conf.ConfigCheckInterval),
+		StartRenewDur:       time.Duration(cl.conf.StartRenewDur),
+	}
+	conf.Secrets = make([]*secretConf, len(cl.conf.Secrets))
+	for i, s := range cl.conf.Secrets {
+		conf.Secrets[i] = s.Copy()
+	}
+	return conf
 }
 
 // Watch blocks until a change in the config is seen and succesfully validates. If
@@ -151,7 +164,7 @@ func (cl *confLoader) load() error {
 	return nil
 }
 
-type allConf struct {
+type internalAllConf struct {
 	Email               string        `json:"email"`
 	UseProd             *bool         `json:"use_prod"`
 	AllowRemoteDebug    bool          `json:"allow_remote_debug"`
@@ -159,6 +172,16 @@ type allConf struct {
 	TLSDir              string        `json:"tls_dir"`
 	ConfigCheckInterval jsonDuration  `json:"config_check_interval"`
 	StartRenewDur       jsonDuration  `json:"start_renew_duration"`
+}
+
+type allConf struct {
+	Email               string
+	UseProd             bool
+	AllowRemoteDebug    bool
+	Secrets             []*secretConf
+	TLSDir              string
+	ConfigCheckInterval time.Duration
+	StartRenewDur       time.Duration
 }
 
 type secretConf struct {
@@ -170,6 +193,15 @@ type secretConf struct {
 
 func (sconf *secretConf) FullName() nsSecName {
 	return nsSecName{sconf.Namespace, sconf.Name}
+}
+
+func (sconf *secretConf) Copy() *secretConf {
+	return &secretConf{
+		Namespace: sconf.Namespace,
+		Name:      sconf.Name,
+		Domains:   slices.Clone(sconf.Domains),
+		UseRSA:    sconf.UseRSA,
+	}
 }
 
 type nsSecName struct {
@@ -209,14 +241,14 @@ func (d jsonDuration) String() string {
 }
 
 func dirURLFromConf(conf *allConf) string {
-	if *conf.UseProd {
+	if conf.UseProd {
 		return "https://acme-v02.api.letsencrypt.org/directory"
 	}
 	return "https://acme-staging-v02.api.letsencrypt.org/directory"
 }
 
-func unmarshalConf(jsonData []byte) (*allConf, error) {
-	conf := &allConf{}
+func unmarshalConf(jsonData []byte) (*internalAllConf, error) {
+	conf := &internalAllConf{}
 	err := json.Unmarshal(jsonData, conf)
 	if err != nil {
 		return nil, err
@@ -230,7 +262,7 @@ func unmarshalConf(jsonData []byte) (*allConf, error) {
 	return conf, err
 }
 
-func validateConf(conf *allConf) error {
+func validateConf(conf *internalAllConf) error {
 	if conf.Email == "" {
 		return fmt.Errorf("'email' must be set in the config file %#v", *confPath)
 	}
