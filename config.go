@@ -104,7 +104,7 @@ func (cl *confLoader) Watch() *allConf {
 		// c is always non-nil here since we require the first load of the
 		// config to occur at construction time in newConfLoader. We might
 		// have a c from a previous load, but it'll be useful.
-		waitDur = time.Duration(c.ConfigCheckInterval)
+		waitDur = c.ConfigCheckInterval
 		next := start.Add(waitDur)
 
 		prevLoadSuccessful := prevErr == nil
