@@ -34,16 +34,10 @@ func (lc *leClient) CreateCert(ctx context.Context, sconf *secretConf) (*newCert
 	}
 	domains := uniqueDomains(sconf.Domains)
 
-	type domErr struct {
-		dom     string
-		err     error
-		authURI string
-	}
 	log.Printf("attempting to authorize secret %s with domains %s", sconf.FullName(), domains)
 	order, err := lc.authorizeDomains(ctx, domains)
 	if err != nil {
 		err = fmt.Errorf("in secret %s, failed to authorize order of domains %s: %s", sconf.FullName(), domains, err)
-
 		return nil, err
 	}
 
@@ -195,11 +189,6 @@ func newLEClientMaker(c *http.Client, accountKey *rsa.PrivateKey, responder *leR
 type accountInfo struct {
 	directoryURL string
 	email        string
-}
-
-type clientAndRegURI struct {
-	leClient        *leClient
-	registrationURI string
 }
 
 func (lcm *leClientMaker) Make(ctx context.Context, directoryURL, email string) (*leClient, error) {

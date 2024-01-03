@@ -22,10 +22,10 @@ import (
 // in the config file using it alone is impossible. That means that lekube can
 // boot with a busted config file and the user wouldn't know unless they were
 // tracking the stats. But changing Watch to always return the error would mean
-// the lekube process could cratch whenever the user writes a busted config into
-// that file path and that would cause a reboot and another account
-// acquisition. That's a bummer. So, take the L and load the config file here
-// and let Watch eat and record the errors.
+// the lekube process could crash whenever the user writes a busted config into
+// that file path and that would cause a reboot and another account acquisition.
+// That's a bummer. So, take the L and load the config file here and let Watch
+// eat and record the errors.
 func newConfLoader(fp string, lastCheck, lastChange *atomic.Int64) (*confLoader, *allConf, error) {
 	cl := &confLoader{
 		path:       fp,
@@ -268,7 +268,7 @@ func validateConf(conf *internalAllConf) error {
 	}
 
 	if conf.UseProd == nil {
-		return fmt.Errorf("'use_prod' must be set to `false` or `true`. `false will mean use the staging Let's Encrypt API (which has untrusted certs and higher rate limits), and `true` means use the production Let's Encrypt API with working certs but much lower rate limits. lekube strongly recommends setting this to `false` until you've seen your staging certs be successfully created.")
+		return fmt.Errorf("'use_prod' must be set to `false` or `true`. `false will mean use the staging Let's Encrypt API (which has untrusted certs and higher rate limits), and `true` means use the production Let's Encrypt API with working certs but much lower rate limits. lekube strongly recommends setting this to `false` until you've seen your staging certs be successfully created")
 	}
 
 	secs := make(map[nsSecName]bool)
