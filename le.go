@@ -104,30 +104,29 @@ func (lc *leClient) authorizeDomains(ctx context.Context, domains []string) (*ac
 	}
 	order, err := lc.cl.AuthorizeOrder(ctx, authzIDs)
 	if err != nil {
-		log.Printf("error during AuthorizeOrder call for domains %s: %s (%#v)", domains, err, err)
-		return nil, err
+		return nil, fmt.Errorf("error during AuthorizeOrder call for domains %s: %w", domains, err)
 	}
 
 	for i, azURL := range order.AuthzURLs {
 		a, err := lc.cl.GetAuthorization(ctx, azURL)
 		if err != nil {
-			log.Printf("error during GetAuthorization call for authz url %s (likely for domain %s): %s", azURL, domains[i], err)
+			return nil, fmt.Errorf("error during GetAuthorization call for authz url %s (likely for domain %s): %w", azURL, domains[i], err)
 		}
 		ch, err := findChallenge(a)
 		if err != nil {
-			return nil, fmt.Errorf("unable to find matching challenge for authz of domain %s (authz URL %s): %s", a.Identifier.Value, azURL, err)
+			return nil, fmt.Errorf("unable to find matching challenge for authz of domain %s (authz URL %s): %w", a.Identifier.Value, azURL, err)
 		}
 		log.Printf("adding authorization for %#v, token %#v, authz url %s", a.Identifier.Value, ch.Token, a.URI)
 		lc.responder.AddAuthorization(a.Identifier.Value, ch.Token)
 		_, err = lc.cl.Accept(ctx, ch)
 		if err != nil {
-			return nil, fmt.Errorf("error during Accept of challenge for %s: %s", a.Identifier.Value, err)
+			return nil, fmt.Errorf("error during Accept of challenge for %s: %w", a.Identifier.Value, err)
 		}
 	}
 
 	afterOrder, err := lc.cl.WaitOrder(ctx, order.URI)
 	if err != nil {
-		return nil, fmt.Errorf("error during WaitOrder for domains %s, order URI %s: %s", domains, order.URI, err)
+		return nil, fmt.Errorf("error during WaitOrder for domains %s, order URI %s: %w", domains, order.URI, err)
 	}
 	if afterOrder.Status == acme.StatusInvalid {
 		return nil, fmt.Errorf("authorization marked as invalid")
