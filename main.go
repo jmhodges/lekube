@@ -19,9 +19,17 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	_ "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
+	_ "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace"
 	"go.opencensus.io/examples/exporter"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
+	_ "go.opentelemetry.io/contrib/detectors/gcp"
+	"go.opentelemetry.io/otel"
+	_ "go.opentelemetry.io/otel/metric"
+	_ "go.opentelemetry.io/otel/sdk/metric"
+	_ "go.opentelemetry.io/otel/sdk/trace"
+	_ "go.opentelemetry.io/otel/trace"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/time/rate"
 	"google.golang.org/genproto/googleapis/api/monitoredres"
@@ -38,6 +46,9 @@ var (
 	httpAddr     = flag.String("addr", ":10080", "address to boot the HTTP server on")
 	httpsAddr    = flag.String("httpsAddr", ":10443", "address to boot the HTTPS server on")
 	leTimeoutDur = flag.Duration("leTimeout", 30*time.Minute, "max time to spend fetching and creating a certificate (but not time spent fetching and storing secrets)")
+
+	_tracer = otel.Tracer("lekube")
+	_meter  = otel.Meter("lekube")
 
 	fetchLECertPrefix    = "stages/fetch-cert/"
 	fetchLECertAttempts  = stats.Int64(fetchLECertPrefix+"attempts", "The number of attempts when fetching the Let's Encrypt certificate.", stats.UnitDimensionless)
