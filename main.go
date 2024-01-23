@@ -285,7 +285,7 @@ func run(lcm *leClientMaker, client corev1.CoreV1Interface, conf *allConf, leTim
 		tlsSec, err := fetchK8SSecret(secCtx, client.Secrets(secConf.Namespace), secConf.Name)
 		if err != nil {
 			secSpan.SetStatus(codes.Error, err.Error())
-			recordErrorMetric(fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
+			recordErrorMetric(secCtx, fetchSecStage, "unable to fetch TLS secret value %#v: %s", secConf.Name, err)
 			continue
 		}
 		secSpan.SetStatus(codes.Ok, "")
@@ -340,13 +340,13 @@ func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *le
 	acmeClient, err := lcm.Make(fetchCtx, dirURLFromConf(conf), conf.Email)
 	if err != nil {
 		fetchSpan.SetStatus(codes.Error, fmt.Sprintf("unable to get client for Let's Encrypt API that is up to date: %s", err))
-		recordErrorMetric(fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
+		recordErrorMetric(fetchCtx, fetchLECertStage, "unable to get client for Let's Encrypt API that is up to date: %s", err)
 		return
 	}
 	leCert, err := acmeClient.CreateCert(fetchCtx, secConf)
 	if err != nil {
 		fetchSpan.SetStatus(codes.Error, fmt.Sprintf("unable to get Let's Encrypt certificate: %s", err))
-		recordErrorMetric(fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
+		recordErrorMetric(fetchCtx, fetchLECertStage, "unable to get Let's Encrypt certificate for %s: %s", secConf.FullName(), err)
 		return
 	}
 	fetchLECertSuccesses.Add(fetchCtx, 1)
@@ -364,7 +364,7 @@ func workOn(ctx context.Context, tlsSec *tlsSecret, secConf *secretConf, lcm *le
 	err = storeK8SSecret(ctx, client.Secrets(secConf.Namespace), secConf, oldSec, leCert)
 	if err != nil {
 		storeSpan.SetStatus(codes.Error, err.Error())
-		recordErrorMetric(storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
+		recordErrorMetric(ctx, storeSecStage, "unable to store the TLS cert and key as secret %#v: %s", secConf.Name, err)
 		return
 	}
 	storeSpan.SetStatus(codes.Ok, "")
@@ -463,19 +463,7 @@ var stageErrors = map[stage]metric.Int64Counter{
 	loadConfigStage:  loadConfigErrors,
 }
 
-func recordErrorMetric(st stage, format string, args ...interface{}) {
-	// v1.21.0 and earlier of OpenTelemetry have a bug where they drop metrics
-	// that are added with a context that has been errored. This is unfortunate
-	// because it means timeouts and other Context cancelling errors will never
-	// be recorded. This will be fixed when
-	// https://github.com/open-telemetry/opentelemetry-go/commit/8e756513a630cc0e80c8b65528f27161a87a3cc8
-	// is released, but that's not yet. Until then, we'll set up a context on
-	// our own here. When dependabot bumps the otel version, our
-	// TestOtelDroppingContextData will fail. When that happens, we can change
-	// this func to accept a Context, fix the context.TODOs elsewhere, and
-	// remove the test.
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
+func recordErrorMetric(ctx context.Context, st stage, format string, args ...interface{}) {
 	errorCount.Add(ctx, 1)
 	stageErrors[st].Add(ctx, 1)
 	log.Printf(format, args...)
