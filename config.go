@@ -33,11 +33,13 @@ func newConfLoader(fp string, lastCheck, lastChange *atomic.Int64) (*confLoader,
 		lastChange: lastChange,
 	}
 	err := cl.load()
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 20*time.Second, errors.New("metrics addition in newConfLoader"))
+	defer cancel()
 	if err != nil {
-		loadConfigErrors.Add(context.TODO(), 1)
+		loadConfigErrors.Add(ctx, 1)
 		return nil, nil, err
 	}
-	loadConfigSuccesses.Add(context.TODO(), 1)
+	loadConfigSuccesses.Add(ctx, 1)
 	return cl, cl.Get(), nil
 }
 
@@ -121,7 +123,7 @@ func (cl *confLoader) Watch() *allConf {
 			}
 		} else {
 			prevErr = err
-			recordErrorMetric(loadConfigStage, "unable to load config file in watch goroutine: %s", err)
+			recordErrorMetric(context.TODO(), loadConfigStage, "unable to load config file in watch goroutine: %s", err)
 		}
 		time.Sleep(next.Sub(start))
 	}
