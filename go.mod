@@ -11,7 +11,7 @@ require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.23.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0
 	go.opentelemetry.io/otel v1.23.1
-	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v0.45.0
+	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.23.1
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.23.1
 	go.opentelemetry.io/otel/sdk v1.23.1
 	golang.org/x/crypto v0.19.0
