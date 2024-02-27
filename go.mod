@@ -9,7 +9,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.21.0
 	github.com/go-jose/go-jose/v3 v3.0.2
 	go.opentelemetry.io/contrib/detectors/gcp v1.23.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.48.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.23.1
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.23.1
