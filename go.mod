@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.5
 
 require (
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.45.0
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.46.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.21.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	go.opentelemetry.io/contrib/detectors/gcp v1.24.0
@@ -33,7 +33,7 @@ require (
 	cloud.google.com/go/compute v1.23.4 // indirect
 	cloud.google.com/go/trace v1.10.5 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.21.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.45.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.46.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
