@@ -14,7 +14,7 @@ cloud.google.com/go/monitoring/internal
 cloud.google.com/go/trace/apiv2
 cloud.google.com/go/trace/apiv2/tracepb
 cloud.google.com/go/trace/internal
-# github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.21.0
+# github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.22.0
 ## explicit; go 1.20
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.46.0
@@ -164,8 +164,8 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# go.opentelemetry.io/contrib/detectors/gcp v1.24.0
-## explicit; go 1.20
+# go.opentelemetry.io/contrib/detectors/gcp v1.25.0
+## explicit; go 1.21
 go.opentelemetry.io/contrib/detectors/gcp
 # go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.48.0
 ## explicit; go 1.20
