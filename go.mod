@@ -12,7 +12,7 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 	go.opentelemetry.io/otel v1.25.0
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.24.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.24.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.25.0
 	go.opentelemetry.io/otel/sdk v1.25.0
 	golang.org/x/crypto v0.22.0
 	golang.org/x/time v0.5.0
