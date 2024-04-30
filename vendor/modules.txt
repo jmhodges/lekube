@@ -1,7 +1,4 @@
-# cloud.google.com/go/compute v1.23.4
-## explicit; go 1.19
-cloud.google.com/go/compute/internal
-# cloud.google.com/go/compute/metadata v0.2.3
+# cloud.google.com/go/compute/metadata v0.3.0
 ## explicit; go 1.19
 cloud.google.com/go/compute/metadata
 # cloud.google.com/go/monitoring v1.18.0
@@ -164,7 +161,7 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# go.opentelemetry.io/contrib/detectors/gcp v1.25.0
+# go.opentelemetry.io/contrib/detectors/gcp v1.26.0
 ## explicit; go 1.21
 go.opentelemetry.io/contrib/detectors/gcp
 # go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.48.0
@@ -202,7 +199,7 @@ go.opentelemetry.io/otel/exporters/stdout/stdouttrace
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
 go.opentelemetry.io/otel/metric/noop
-# go.opentelemetry.io/otel/sdk v1.25.0
+# go.opentelemetry.io/otel/sdk v1.26.0
 ## explicit; go 1.21
 go.opentelemetry.io/otel/sdk
 go.opentelemetry.io/otel/sdk/instrumentation
