@@ -14,8 +14,8 @@ cloud.google.com/go/trace/internal
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.22.0
 ## explicit; go 1.20
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp
-# github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.46.0
-## explicit; go 1.20
+# github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.47.0
+## explicit; go 1.21
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.23.0
 ## explicit; go 1.21
