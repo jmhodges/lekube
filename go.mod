@@ -3,7 +3,7 @@ module github.com/jmhodges/lekube
 go 1.22.2
 
 require (
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.46.0
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.47.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.23.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	go.opentelemetry.io/contrib/detectors/gcp v1.26.0
