@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.0
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.23.0
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	go.opentelemetry.io/contrib/detectors/gcp v1.27.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0
