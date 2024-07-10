@@ -192,7 +192,7 @@ go.opentelemetry.io/otel/semconv/v1.26.0
 # go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.27.0
 ## explicit; go 1.21
 go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
-# go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.27.0
+# go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.28.0
 ## explicit; go 1.21
 go.opentelemetry.io/otel/exporters/stdout/stdouttrace
 # go.opentelemetry.io/otel/metric v1.28.0
