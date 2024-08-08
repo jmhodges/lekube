@@ -14,8 +14,8 @@ cloud.google.com/go/auth/internal/credsfile
 cloud.google.com/go/auth/internal/jwt
 cloud.google.com/go/auth/internal/transport
 cloud.google.com/go/auth/internal/transport/cert
-# cloud.google.com/go/auth/oauth2adapt v0.2.2
-## explicit; go 1.19
+# cloud.google.com/go/auth/oauth2adapt v0.2.3
+## explicit; go 1.20
 cloud.google.com/go/auth/oauth2adapt
 # cloud.google.com/go/compute/metadata v0.5.0
 ## explicit; go 1.20
@@ -25,7 +25,7 @@ cloud.google.com/go/compute/metadata
 cloud.google.com/go/monitoring/apiv3/v2
 cloud.google.com/go/monitoring/apiv3/v2/monitoringpb
 cloud.google.com/go/monitoring/internal
-# cloud.google.com/go/trace v1.10.9
+# cloud.google.com/go/trace v1.10.10
 ## explicit; go 1.20
 cloud.google.com/go/trace/apiv2
 cloud.google.com/go/trace/apiv2/tracepb
@@ -36,7 +36,7 @@ github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1
 ## explicit; go 1.21
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric
-# github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.0
+# github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.1
 ## explicit; go 1.21
 github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace
 # github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1
@@ -182,8 +182,8 @@ go.opencensus.io/trace/tracestate
 # go.opentelemetry.io/contrib/detectors/gcp v1.28.0
 ## explicit; go 1.21
 go.opentelemetry.io/contrib/detectors/gcp
-# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0
-## explicit; go 1.20
+# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.52.0
+## explicit; go 1.21
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/internal
 # go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
@@ -310,7 +310,7 @@ google.golang.org/api/transport/http/internal/propagation
 # google.golang.org/genproto v0.0.0-20240708141625-4ad9e859172b
 ## explicit; go 1.20
 google.golang.org/genproto/googleapis/type/calendarperiod
-# google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094
+# google.golang.org/genproto/googleapis/api v0.0.0-20240709173604-40e1e62336c5
 ## explicit; go 1.20
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
@@ -318,7 +318,7 @@ google.golang.org/genproto/googleapis/api/distribution
 google.golang.org/genproto/googleapis/api/label
 google.golang.org/genproto/googleapis/api/metric
 google.golang.org/genproto/googleapis/api/monitoredres
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20240708141625-4ad9e859172b
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20240709173604-40e1e62336c5
 ## explicit; go 1.20
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
