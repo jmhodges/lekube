@@ -1,6 +1,6 @@
 module github.com/jmhodges/lekube
 
-go 1.22.2
+go 1.23.0
 
 require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1
