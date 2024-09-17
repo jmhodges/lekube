@@ -181,8 +181,8 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
-# go.opentelemetry.io/contrib/detectors/gcp v1.29.0
-## explicit; go 1.21
+# go.opentelemetry.io/contrib/detectors/gcp v1.30.0
+## explicit; go 1.22
 go.opentelemetry.io/contrib/detectors/gcp
 # go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.52.0
 ## explicit; go 1.21
