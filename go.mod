@@ -15,7 +15,7 @@ require (
 	golang.org/x/crypto v0.27.0
 	golang.org/x/time v0.6.0
 	k8s.io/api v0.30.3
-	k8s.io/apimachinery v0.31.0
+	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.30.3
 )
 
