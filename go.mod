@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.48.1
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.1
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.24.2
 	github.com/go-jose/go-jose/v3 v3.0.3
 	go.opentelemetry.io/contrib/detectors/gcp v1.30.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.55.0
@@ -34,7 +34,7 @@ require (
 require (
 	cloud.google.com/go/trace v1.10.10 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.24.1 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.1 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.48.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -70,7 +70,7 @@ require (
 	google.golang.org/api v0.188.0 // indirect
 	google.golang.org/genproto v0.0.0-20240708141625-4ad9e859172b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240709173604-40e1e62336c5 // indirect
-	google.golang.org/grpc v1.64.1 // indirect
+	google.golang.org/grpc v1.65.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
