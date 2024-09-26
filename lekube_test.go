@@ -2,10 +2,11 @@ package main
 
 import (
 	"net/http/httptest"
-	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestConfigLoadGoldenPath(t *testing.T) {
@@ -15,7 +16,7 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := cl.Get()
-	if !reflect.DeepEqual(c, c2) {
+	if !cmp.Equal(c, c2) {
 		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
 	}
 	email := "fake@example.com"
@@ -62,7 +63,7 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 		t.Fatalf("secrets: want %d secrets, got %d", len(secs), len(c.Secrets))
 	}
 	for i, sec := range secs {
-		if !reflect.DeepEqual(sec, c.Secrets[i]) {
+		if !cmp.Equal(sec, c.Secrets[i]) {
 			t.Errorf("secret %d: want %#v, got %#v", i, sec, c.Secrets[i])
 		}
 	}
@@ -75,7 +76,7 @@ func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 		t.Fatal(err)
 	}
 	c2 := cl.Get()
-	if !reflect.DeepEqual(c, c2) {
+	if !cmp.Equal(c, c2) {
 		t.Errorf("config pointers returned by newConfLoader and Get should be the same but were not")
 	}
 	expected := 30 * time.Second

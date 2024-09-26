@@ -9,12 +9,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"maps"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -486,7 +486,7 @@ func domainMismatch(cert *x509.Certificate, domains []string) bool {
 	for _, d := range domains {
 		doms[d] = struct{}{}
 	}
-	return !reflect.DeepEqual(cdoms, doms)
+	return !maps.Equal(cdoms, doms)
 }
 
 func isBlockedRequest(r *http.Request) bool {
