@@ -11,6 +11,8 @@ updates:
         patterns:
           - "go.opentelemetry.io/otel*"
           - "go.opentelemetry.io/contrib*"
+          - "github.com/GoogleCloudPlatform/opentelemetry-operations-go"
+          - "github.com/GoogleCloudPlatform/opentelemetry-operations-go/*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
