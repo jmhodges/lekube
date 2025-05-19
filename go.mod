@@ -1,6 +1,7 @@
 module github.com/jmhodges/lekube
 
-go 1.23.0
+go 1.24.0
+
 toolchain go1.24.1
 
 require (
@@ -17,7 +18,7 @@ require (
 	golang.org/x/crypto v0.38.0
 	golang.org/x/time v0.11.0
 	k8s.io/api v0.33.0
-	k8s.io/apimachinery v0.33.0
+	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v0.33.0
 )
 
