@@ -17,9 +17,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.37.0
 	golang.org/x/crypto v0.44.0
 	golang.org/x/time v0.14.0
-	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.1
+	k8s.io/api v0.34.2
+	k8s.io/apimachinery v0.34.2
+	k8s.io/client-go v0.34.2
 )
 
 require (
