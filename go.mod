@@ -14,7 +14,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.41.0
 	go.opentelemetry.io/otel/sdk v1.41.0
 	golang.org/x/crypto v0.48.0
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 	k8s.io/api v0.35.2
 	k8s.io/apimachinery v0.35.2
 	k8s.io/client-go v0.35.2
