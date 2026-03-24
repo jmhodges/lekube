@@ -13,6 +13,10 @@ updates:
           - "go.opentelemetry.io/contrib*"
           - "github.com/GoogleCloudPlatform/opentelemetry-operations-go"
           - "github.com/GoogleCloudPlatform/opentelemetry-operations-go/*"
+      k8s:
+        applies-to: version-updates
+        patterns:
+          - "k8s.io/*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
