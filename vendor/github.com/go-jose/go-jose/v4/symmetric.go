@@ -21,6 +21,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -30,9 +31,7 @@ import (
 	"hash"
 	"io"
 
-	"golang.org/x/crypto/pbkdf2"
-
-	josecipher "github.com/go-jose/go-jose/v3/cipher"
+	josecipher "github.com/go-jose/go-jose/v4/cipher"
 )
 
 // RandReader is a cryptographically secure random number generator (stubbed out in tests).
@@ -330,7 +329,10 @@ func (ctx *symmetricKeyCipher) encryptKey(cek []byte, alg KeyAlgorithm) (recipie
 
 		// derive key
 		keyLen, h := getPbkdf2Params(alg)
-		key := pbkdf2.Key(ctx.key, salt, ctx.p2c, keyLen, h)
+		key, err := pbkdf2.Key(h, string(ctx.key), salt, ctx.p2c, keyLen)
+		if err != nil {
+			return recipientInfo{}, nil
+		}
 
 		// use AES cipher with derived key
 		block, err := aes.NewCipher(key)
@@ -432,7 +434,10 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 
 		// derive key
 		keyLen, h := getPbkdf2Params(alg)
-		key := pbkdf2.Key(ctx.key, salt, p2c, keyLen, h)
+		key, err := pbkdf2.Key(h, string(ctx.key), salt, p2c, keyLen)
+		if err != nil {
+			return nil, err
+		}
 
 		// use AES cipher with derived key
 		block, err := aes.NewCipher(key)
@@ -454,7 +459,7 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 func (ctx symmetricMac) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
 	mac, err := ctx.hmac(payload, alg)
 	if err != nil {
-		return Signature{}, errors.New("go-jose/go-jose: failed to compute hmac")
+		return Signature{}, err
 	}
 
 	return Signature{
@@ -486,12 +491,24 @@ func (ctx symmetricMac) verifyPayload(payload []byte, mac []byte, alg SignatureA
 func (ctx symmetricMac) hmac(payload []byte, alg SignatureAlgorithm) ([]byte, error) {
 	var hash func() hash.Hash
 
+	// https://datatracker.ietf.org/doc/html/rfc7518#section-3.2
+	// A key of the same size as the hash output (for instance, 256 bits for
+	// "HS256") or larger MUST be used
 	switch alg {
 	case HS256:
+		if len(ctx.key)*8 < 256 {
+			return nil, ErrInvalidKeySize
+		}
 		hash = sha256.New
 	case HS384:
+		if len(ctx.key)*8 < 384 {
+			return nil, ErrInvalidKeySize
+		}
 		hash = sha512.New384
 	case HS512:
+		if len(ctx.key)*8 < 512 {
+			return nil, ErrInvalidKeySize
+		}
 		hash = sha512.New
 	default:
 		return nil, ErrUnsupportedAlgorithm
