@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	jose "github.com/go-jose/go-jose/v3"
+	jose "github.com/go-jose/go-jose/v4"
 )
 
 type leResponder struct {

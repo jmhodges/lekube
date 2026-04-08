@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-jose/go-jose/v3/json"
+	"github.com/go-jose/go-jose/v4/json"
 )
 
 // NonceSource represents a source of random nonces to go into JWS objects
@@ -49,6 +49,11 @@ type Signer interface {
 //   - JSONWebKey
 //   - []byte (an HMAC key)
 //   - Any type that satisfies the OpaqueSigner interface
+//
+// If the key is an HMAC key, it must have at least as many bytes as the relevant hash output:
+//   - HS256: 32 bytes
+//   - HS384: 48 bytes
+//   - HS512: 64 bytes
 type SigningKey struct {
 	Algorithm SignatureAlgorithm
 	Key       interface{}
@@ -353,8 +358,15 @@ func (ctx *genericSigner) Options() SignerOptions {
 //   - *rsa.PublicKey
 //   - *JSONWebKey
 //   - JSONWebKey
+//   - *JSONWebKeySet
+//   - JSONWebKeySet
 //   - []byte (an HMAC key)
 //   - Any type that implements the OpaqueVerifier interface.
+//
+// If the key is an HMAC key, it must have at least as many bytes as the relevant hash output:
+//   - HS256: 32 bytes
+//   - HS384: 48 bytes
+//   - HS512: 64 bytes
 func (obj JSONWebSignature) Verify(verificationKey interface{}) ([]byte, error) {
 	err := obj.DetachedVerify(obj.payload, verificationKey)
 	if err != nil {
@@ -378,7 +390,10 @@ func (obj JSONWebSignature) UnsafePayloadWithoutVerification() []byte {
 // The verificationKey argument must have one of the types allowed for the
 // verificationKey argument of JSONWebSignature.Verify().
 func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey interface{}) error {
-	key := tryJWKS(verificationKey, obj.headers()...)
+	key, err := tryJWKS(verificationKey, obj.headers()...)
+	if err != nil {
+		return err
+	}
 	verifier, err := newVerifier(key)
 	if err != nil {
 		return err
@@ -389,15 +404,23 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 	}
 
 	signature := obj.Signatures[0]
-	headers := signature.mergedHeaders()
-	critical, err := headers.getCritical()
-	if err != nil {
-		return err
+
+	if signature.header != nil {
+		// Per https://www.rfc-editor.org/rfc/rfc7515.html#section-4.1.11,
+		// 4.1.11. "crit" (Critical) Header Parameter
+		// "When used, this Header Parameter MUST be integrity
+		// protected; therefore, it MUST occur only within the JWS
+		// Protected Header."
+		err = signature.header.checkNoCritical()
+		if err != nil {
+			return err
+		}
 	}
 
-	for _, name := range critical {
-		if !supportedCritical[name] {
-			return ErrCryptoFailure
+	if signature.protected != nil {
+		err = signature.protected.checkSupportedCritical(supportedCritical)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -406,6 +429,7 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 		return ErrCryptoFailure
 	}
 
+	headers := signature.mergedHeaders()
 	alg := headers.getSignatureAlgorithm()
 	err = verifier.verifyPayload(input, signature.Signature, alg)
 	if err == nil {
@@ -443,7 +467,10 @@ func (obj JSONWebSignature) VerifyMulti(verificationKey interface{}) (int, Signa
 // The verificationKey argument must have one of the types allowed for the
 // verificationKey argument of JSONWebSignature.Verify().
 func (obj JSONWebSignature) DetachedVerifyMulti(payload []byte, verificationKey interface{}) (int, Signature, error) {
-	key := tryJWKS(verificationKey, obj.headers()...)
+	key, err := tryJWKS(verificationKey, obj.headers()...)
+	if err != nil {
+		return -1, Signature{}, err
+	}
 	verifier, err := newVerifier(key)
 	if err != nil {
 		return -1, Signature{}, err
@@ -451,14 +478,22 @@ func (obj JSONWebSignature) DetachedVerifyMulti(payload []byte, verificationKey 
 
 outer:
 	for i, signature := range obj.Signatures {
-		headers := signature.mergedHeaders()
-		critical, err := headers.getCritical()
-		if err != nil {
-			continue
+		if signature.header != nil {
+			// Per https://www.rfc-editor.org/rfc/rfc7515.html#section-4.1.11,
+			// 4.1.11. "crit" (Critical) Header Parameter
+			// "When used, this Header Parameter MUST be integrity
+			// protected; therefore, it MUST occur only within the JWS
+			// Protected Header."
+			err = signature.header.checkNoCritical()
+			if err != nil {
+				continue outer
+			}
 		}
 
-		for _, name := range critical {
-			if !supportedCritical[name] {
+		if signature.protected != nil {
+			// Check for only supported critical headers
+			err = signature.protected.checkSupportedCritical(supportedCritical)
+			if err != nil {
 				continue outer
 			}
 		}
@@ -468,6 +503,7 @@ outer:
 			continue
 		}
 
+		headers := signature.mergedHeaders()
 		alg := headers.getSignatureAlgorithm()
 		err = verifier.verifyPayload(input, signature.Signature, alg)
 		if err == nil {
