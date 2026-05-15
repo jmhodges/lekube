@@ -37,6 +37,10 @@ func TestConfigLoadGoldenPath(t *testing.T) {
 	if c.StartRenewDur != expectedRenewDur {
 		t.Errorf("start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
 	}
+	expectedBootDelay := 2 * time.Minute
+	if c.ConfigCheckBootDelay != expectedBootDelay {
+		t.Errorf("config_check_boot_delay: want %s, got %s", expectedBootDelay, c.ConfigCheckBootDelay)
+	}
 	defaultNS := "default"
 	stagingNS := "staging"
 
@@ -86,6 +90,10 @@ func TestConfigLoadDefaultConfigCheckInterval(t *testing.T) {
 	expectedRenewDur := 504 * time.Hour
 	if c.StartRenewDur != expectedRenewDur {
 		t.Errorf("default start_renew_dur: want %s, got %s", expectedRenewDur, c.StartRenewDur)
+	}
+	expectedBootDelay := 1 * time.Minute
+	if c.ConfigCheckBootDelay != expectedBootDelay {
+		t.Errorf("default config_check_boot_delay: want %s, got %s", expectedBootDelay, c.ConfigCheckBootDelay)
 	}
 }
 

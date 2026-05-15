@@ -208,6 +208,7 @@ func main() {
 	}()
 	go func() {
 		conf := conf
+		time.Sleep(conf.ConfigCheckBootDelay)
 		runCh <- conf
 		t := time.NewTicker(1 * time.Hour)
 		for {
