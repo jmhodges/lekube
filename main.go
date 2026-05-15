@@ -208,6 +208,7 @@ func main() {
 	}()
 	go func() {
 		conf := conf
+		log.Printf("Booting up and waiting for config_check_boot_delay of %s before first run", conf.ConfigCheckBootDelay)
 		time.Sleep(conf.ConfigCheckBootDelay)
 		runCh <- conf
 		t := time.NewTicker(1 * time.Hour)
