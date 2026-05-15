@@ -68,13 +68,14 @@ func (cl *confLoader) Get() *allConf {
 	cl.confMu.Lock()
 	defer cl.confMu.Unlock()
 	conf := &allConf{
-		Email:               cl.conf.Email,
-		UseProd:             cl.conf.UseProd != nil && *cl.conf.UseProd,
-		AllowRemoteDebug:    cl.conf.AllowRemoteDebug,
-		Secrets:             []*secretConf{},
-		TLSDir:              cl.conf.TLSDir,
-		ConfigCheckInterval: time.Duration(cl.conf.ConfigCheckInterval),
-		StartRenewDur:       time.Duration(cl.conf.StartRenewDur),
+		Email:                cl.conf.Email,
+		UseProd:              cl.conf.UseProd != nil && *cl.conf.UseProd,
+		AllowRemoteDebug:     cl.conf.AllowRemoteDebug,
+		Secrets:              []*secretConf{},
+		TLSDir:               cl.conf.TLSDir,
+		ConfigCheckInterval:  time.Duration(cl.conf.ConfigCheckInterval),
+		ConfigCheckBootDelay: time.Duration(cl.conf.ConfigCheckBootDelay),
+		StartRenewDur:        time.Duration(cl.conf.StartRenewDur),
 	}
 	conf.Secrets = make([]*secretConf, len(cl.conf.Secrets))
 	for i, s := range cl.conf.Secrets {
@@ -171,6 +172,11 @@ type internalAllConf struct {
 	TLSDir              string        `json:"tls_dir"`
 	ConfigCheckInterval jsonDuration  `json:"config_check_interval"`
 	StartRenewDur       jsonDuration  `json:"start_renew_duration"`
+	// ConfigCheckBootDelay is how long to wait after boot before starting to
+	// check if the certs need updating. This prevents lekube from kicking off
+	// requests from Let's Encrypt before Let's Encrypt can see the node. It
+	// defaults to 1 minute.
+	ConfigCheckBootDelay jsonDuration `json:"config_check_boot_delay"`
 }
 
 type allConf struct {
@@ -180,7 +186,14 @@ type allConf struct {
 	Secrets             []*secretConf
 	TLSDir              string
 	ConfigCheckInterval time.Duration
-	StartRenewDur       time.Duration
+
+	// ConfigCheckBootDelay is how long to wait after boot before starting to
+	// check if the certs need updating. This prevents lekube from kicking off
+	// requests from Let's Encrypt before Let's Encrypt can see the node. It
+	// defaults to 1 minute.
+	ConfigCheckBootDelay time.Duration
+
+	StartRenewDur time.Duration
 }
 
 type secretConf struct {
@@ -257,6 +270,9 @@ func unmarshalConf(jsonData []byte) (*internalAllConf, error) {
 	}
 	if conf.StartRenewDur == jsonDuration(0) {
 		conf.StartRenewDur = jsonDuration(3 * 7 * 24 * time.Hour)
+	}
+	if conf.ConfigCheckBootDelay == jsonDuration(0) {
+		conf.ConfigCheckBootDelay = jsonDuration(1 * time.Minute)
 	}
 	return conf, err
 }
