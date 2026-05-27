@@ -391,6 +391,11 @@ func fetchK8SSecret(ctx context.Context, client corev1.SecretInterface, secretNa
 		return nil, nil
 	}
 	block, _ := pem.Decode(b)
+	if block == nil {
+		// tls.crt isn't valid PEM, but we don't actually need it to do our
+		// work.
+		return &tlsSecret{Secret: sec}, nil
+	}
 	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
 		// unable to parse certificates already in the Secret, but we don't
