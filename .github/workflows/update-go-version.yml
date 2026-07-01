@@ -1,0 +1,97 @@
+name: Update Go version
+
+# Dependabot keeps the golang Docker image and the Go module dependencies up to
+# date, but it does not touch the `go` directive in go.mod. This workflow checks
+# go.dev for the latest stable Go release on a schedule and, when a newer version
+# is available, bumps the `go` directive, verifies the code still builds and
+# tests pass under it, and opens a pull request.
+
+on:
+  schedule:
+    # Weekly on Mondays at 12:00 UTC, matching the Dependabot cadence.
+    - cron: "0 12 * * 1"
+  # Allow running it by hand from the Actions tab.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-go:
+    name: Update go.mod to latest Go
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Determine current and latest Go versions
+        id: versions
+        run: |
+          set -euo pipefail
+          current="$(awk '/^go / {print $2; exit}' go.mod)"
+          latest="$(curl -fsSL 'https://go.dev/dl/?mode=json' \
+            | jq -r 'map(select(.stable))[0].version' | sed 's/^go//')"
+
+          if [ -z "$latest" ]; then
+            echo "Could not determine the latest stable Go version." >&2
+            exit 1
+          fi
+
+          # Only proceed when the latest version is strictly newer than the
+          # current one (guards against downgrades if go.dev ordering surprises us).
+          newest="$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)"
+
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          if [ "$current" != "$latest" ] && [ "$newest" = "$latest" ]; then
+            echo "update_needed=true" >> "$GITHUB_OUTPUT"
+            echo "Go update available: $current -> $latest"
+          else
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+            echo "go.mod already on the latest stable Go ($current)."
+          fi
+
+      - name: Set up the new Go version
+        if: steps.versions.outputs.update_needed == 'true'
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: ${{ steps.versions.outputs.latest }}
+
+      - name: Bump go.mod and verify the build
+        if: steps.versions.outputs.update_needed == 'true'
+        run: |
+          set -euo pipefail
+          go mod edit -go="${{ steps.versions.outputs.latest }}"
+          go build ./...
+          go test -mod=vendor -race ./...
+
+      - name: Open a pull request
+        if: steps.versions.outputs.update_needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+          CURRENT: ${{ steps.versions.outputs.current }}
+        run: |
+          set -euo pipefail
+          branch="auto/update-go-${LATEST}"
+
+          # If a PR for this exact version is already open, don't open another.
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "A pull request for Go ${LATEST} is already open; nothing to do."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$branch"
+          git add go.mod
+          git commit -m "Update Go to ${LATEST} in go.mod"
+          git push -u --force-with-lease origin "$branch"
+
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Update Go to ${LATEST} in go.mod" \
+            --body "The \`go\` directive in go.mod was updated from \`${CURRENT}\` to \`${LATEST}\` (the latest stable release per https://go.dev/dl/). The code was built and tested against Go ${LATEST} by this workflow before opening the pull request."
